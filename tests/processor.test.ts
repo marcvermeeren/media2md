@@ -39,6 +39,7 @@ None`);
 
     const result = await processFile(join(FIXTURES, "test-image.png"), {
       provider,
+      noCache: true,
     });
 
     expect(result.description).toBe(
@@ -68,6 +69,7 @@ Submit`);
 
     const result = await processFile(join(FIXTURES, "test-image.png"), {
       provider,
+      noCache: true,
     });
 
     expect(result.extractedText).toEqual(["Username", "Password", "Submit"]);
@@ -86,6 +88,7 @@ None`);
 
     const result = await processFile(join(FIXTURES, "test-image.png"), {
       provider,
+      noCache: true,
     });
 
     expect(result.markdown).toMatch(/^---\n/);
@@ -96,7 +99,7 @@ None`);
 
   it("passes image buffer and mime type to provider", async () => {
     const provider = new MockProvider("Just a test.");
-    await processFile(join(FIXTURES, "test-image.png"), { provider });
+    await processFile(join(FIXTURES, "test-image.png"), { provider, noCache: true });
 
     expect(provider.lastImage?.mimeType).toBe("image/png");
     expect(provider.lastImage?.filename).toBe("test-image.png");
@@ -108,6 +111,7 @@ None`);
     const provider = new MockProvider("Test.");
     await processFile(join(FIXTURES, "test-image.png"), {
       provider,
+      noCache: true,
       model: "claude-opus-4-6",
     });
 
@@ -139,6 +143,7 @@ None`);
 
     const result = await processFile(join(FIXTURES, "test-image.jpg"), {
       provider,
+      noCache: true,
     });
 
     expect(result.metadata.format).toBe("JPEG");

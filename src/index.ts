@@ -8,5 +8,6 @@ export { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
 export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/builtins.js";
 export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
 export { sidecarPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
+export { buildCacheKey, getCached, setCached, clearCache, getCacheStats, type CacheEntry, type CacheStats } from "./cache/store.js";
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 export type { Provider, ImageInput, AnalyzeOptions, ProviderResponse } from "./providers/types.js";

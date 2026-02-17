@@ -44,8 +44,12 @@ async function scanDirectory(
     if (entry.isFile() && isSupportedFormat(entry.name)) {
       files.push(fullPath);
     } else if (entry.isDirectory() && recursive) {
-      const sub = await scanDirectory(fullPath, true);
-      files.push(...sub);
+      try {
+        const sub = await scanDirectory(fullPath, true);
+        files.push(...sub);
+      } catch {
+        // Directory may have been removed between listing and scanning
+      }
     }
   }
 

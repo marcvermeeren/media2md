@@ -9,6 +9,7 @@ import { loadTemplate } from "./templates/loader.js";
 import { getPersonaNames } from "./personas/builtins.js";
 import { discoverImages, runBatch, type BatchResult } from "./batch.js";
 import { sidecarPath, writeMarkdown } from "./output/writer.js";
+import { clearCache, getCacheStats } from "./cache/store.js";
 import * as logger from "./utils/logger.js";
 
 const program = new Command();
@@ -25,6 +26,7 @@ program
   .option("-o, --output <dir>", "Output directory for .md files (default: next to image)")
   .option("-r, --recursive", "Recursively scan directories")
   .option("--stdout", "Output to stdout instead of writing files")
+  .option("--no-cache", "Skip cache, force re-processing")
   .option("--concurrency <n>", "Max concurrent API calls", "5")
   .option("-v, --verbose", "Show detailed processing info")
   .addHelpText(
@@ -107,10 +109,12 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
             persona: opts.persona,
             prompt: opts.prompt,
             template,
+            templateName: opts.template,
+            noCache: opts.cache === false,
             provider,
           });
 
-          logger.succeedSpinner(`Analyzed ${filename}`);
+          logger.succeedSpinner(result.cached ? `${filename} (cached)` : `Analyzed ${filename}`);
           processed++;
           results.push({ file: filePath, success: true });
 
@@ -146,16 +150,25 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
             persona: opts.persona,
             prompt: opts.prompt,
             template,
+            templateName: opts.template,
+            noCache: opts.cache === false,
             provider,
           });
 
           const outPath = sidecarPath(filePath, opts.output);
           const outName = outPath.split("/").pop() ?? outPath;
-          logger.updateSpinner(`${prefix}Writing ${outName}...`);
+
+          if (!result.cached) {
+            logger.updateSpinner(`${prefix}Writing ${outName}...`);
+          }
           await writeMarkdown(result.markdown, outPath);
 
           results.push({ file: filePath, success: true, outputPath: outPath });
-          logger.succeedSpinner(`${prefix}${filename} → ${outName}`);
+          logger.succeedSpinner(
+            result.cached
+              ? `${prefix}${filename} → ${outName} (cached)`
+              : `${prefix}${filename} → ${outName}`
+          );
 
           if (opts.verbose) {
             logger.info(`  Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height} | ${result.metadata.sizeHuman}`);
@@ -222,6 +235,32 @@ program
           `  4. Verify: ${pc.cyan("media2md setup")}\n\n`
       );
       process.exit(1);
+    }
+  });
+
+// Cache subcommand
+const cacheCmd = program.command("cache").description("Manage the result cache");
+
+cacheCmd
+  .command("status")
+  .description("Show cache stats")
+  .action(async () => {
+    const stats = await getCacheStats();
+    process.stderr.write(`\n${pc.bold("Cache status")}\n\n`);
+    process.stderr.write(`  Entries:   ${stats.entries}\n`);
+    process.stderr.write(`  Size:      ${stats.sizeHuman}\n`);
+    process.stderr.write(`  Location:  ${pc.dim(stats.cacheDir)}\n\n`);
+  });
+
+cacheCmd
+  .command("clear")
+  .description("Clear all cached results")
+  .action(async () => {
+    const count = await clearCache();
+    if (count > 0) {
+      logger.success(`Cleared ${count} cached result${count > 1 ? "s" : ""}.`);
+    } else {
+      logger.info("Cache is already empty.");
     }
   });
 

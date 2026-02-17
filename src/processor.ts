@@ -12,13 +12,16 @@ import { parseResponse } from "./parser.js";
 import { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
 import { renderTemplate } from "./templates/engine.js";
 import { DEFAULT_TEMPLATE } from "./templates/builtins.js";
+import { buildCacheKey, getCached, setCached } from "./cache/store.js";
 
 export interface ProcessOptions {
   model?: string;
   persona?: string;
   prompt?: string;
   template?: string;
+  templateName?: string;
   provider: Provider;
+  noCache?: boolean;
 }
 
 export interface ProcessResult {
@@ -26,6 +29,7 @@ export interface ProcessResult {
   extractedText: string[];
   metadata: ImageMetadata;
   markdown: string;
+  cached: boolean;
 }
 
 const FILE_SIZE_WARNING_BYTES = 15 * 1024 * 1024; // 15MB
@@ -50,6 +54,27 @@ export async function processFile(
 
   // Extract metadata and get buffer (single read)
   const { metadata, buffer } = await extractMetadata(filePath);
+
+  // Check cache
+  const cacheKey = buildCacheKey(metadata.sha256, {
+    model: options.model,
+    persona: options.persona,
+    prompt: options.prompt,
+    templateName: options.templateName,
+  });
+
+  if (!options.noCache) {
+    const cached = await getCached(cacheKey);
+    if (cached) {
+      return {
+        description: cached.description,
+        extractedText: cached.extractedText,
+        metadata,
+        markdown: cached.markdown,
+        cached: true,
+      };
+    }
+  }
 
   // Warn for large files
   if (metadata.sizeBytes > FILE_SIZE_WARNING_BYTES) {
@@ -108,5 +133,18 @@ export async function processFile(
   const template = options.template ?? DEFAULT_TEMPLATE;
   const markdown = renderTemplate(template, vars);
 
-  return { description, extractedText, metadata, markdown };
+  // Store in cache
+  if (!options.noCache) {
+    await setCached(cacheKey, {
+      hash: metadata.sha256,
+      markdown,
+      description,
+      extractedText,
+      model: options.model ?? "default",
+      persona: options.persona ?? "",
+      cachedAt: now.toISOString(),
+    });
+  }
+
+  return { description, extractedText, metadata, markdown, cached: false };
 }
