@@ -9,5 +9,7 @@ export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/buil
 export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
 export { sidecarPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
 export { buildCacheKey, getCached, setCached, clearCache, getCacheStats, type CacheEntry, type CacheStats } from "./cache/store.js";
+export { loadConfig, mergeOptions, type Media2mdConfig } from "./config.js";
+export { estimateCost, estimateImageTokens, formatCost, type CostEstimate } from "./cost.js";
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 export type { Provider, ImageInput, AnalyzeOptions, ProviderResponse } from "./providers/types.js";

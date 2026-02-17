@@ -39,6 +39,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "commander": "^13.1.0",
+    "cosmiconfig": "^9.0.0",
     "image-size": "^2.0.1",
     "ora": "^8.1.1",
     "picocolors": "^1.1.1"

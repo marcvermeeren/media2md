@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { resolve } from "node:path";
 import { stat } from "node:fs/promises";
 import pc from "picocolors";
+import { loadConfig, mergeOptions } from "./config.js";
 import { processFile } from "./processor.js";
 import { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 import { getSupportedFormats } from "./extractors/metadata.js";
@@ -9,7 +10,9 @@ import { loadTemplate } from "./templates/loader.js";
 import { getPersonaNames } from "./personas/builtins.js";
 import { discoverImages, runBatch, type BatchResult } from "./batch.js";
 import { sidecarPath, writeMarkdown } from "./output/writer.js";
-import { clearCache, getCacheStats } from "./cache/store.js";
+import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/store.js";
+import { extractMetadata } from "./extractors/metadata.js";
+import { estimateCost, formatCost } from "./cost.js";
 import * as logger from "./utils/logger.js";
 
 const program = new Command();
@@ -27,6 +30,8 @@ program
   .option("-r, --recursive", "Recursively scan directories")
   .option("--stdout", "Output to stdout instead of writing files")
   .option("--no-cache", "Skip cache, force re-processing")
+  .option("--estimate", "Show estimated cost without processing")
+  .option("--dry-run", "Show what would be processed without calling API")
   .option("--concurrency <n>", "Max concurrent API calls", "5")
   .option("-v, --verbose", "Show detailed processing info")
   .addHelpText(
@@ -53,8 +58,59 @@ ${pc.bold("Environment:")}
 ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
 `
   )
-  .action(async (files: string[], opts) => {
-    // Check for API key
+  .action(async (files: string[], cliOpts) => {
+    // Load config file and merge with CLI options (CLI takes precedence)
+    const config = await loadConfig();
+    const opts = mergeOptions(cliOpts, config);
+
+    // Try joining args as a single path if individual files aren't found
+    // Handles unquoted filenames with spaces: media2md Screenshot 2026-02-13 at 17.07.21.png
+    const resolvedFiles = await resolveFileArgs(files);
+
+    // Discover files
+    const imagePaths = await discoverImages(resolvedFiles, { recursive: opts.recursive });
+
+    if (imagePaths.length === 0) {
+      logger.warn("No supported images found.");
+      process.exit(0);
+    }
+
+    // --estimate: show cost preview and exit
+    if (opts.estimate || opts.dryRun) {
+      const items: { metadata: Awaited<ReturnType<typeof extractMetadata>>["metadata"]; cached: boolean; path: string }[] = [];
+
+      for (const filePath of imagePaths) {
+        const { metadata } = await extractMetadata(filePath);
+        const key = buildCacheKey(metadata.sha256, {
+          model: opts.model,
+          persona: opts.persona,
+          prompt: opts.prompt,
+          templateName: opts.template,
+        });
+        const cached = opts.cache !== false ? (await getCached(key)) !== null : false;
+        items.push({ metadata, cached, path: filePath });
+      }
+
+      if (opts.dryRun) {
+        process.stderr.write(`\n${pc.bold("Dry run — files that would be processed:")}\n\n`);
+        for (const item of items) {
+          const status = item.cached ? pc.dim("(cached)") : pc.green("(new)");
+          const name = item.path.split("/").pop() ?? item.path;
+          process.stderr.write(`  ${name} ${status}  ${pc.dim(item.metadata.sizeHuman)}\n`);
+        }
+        process.stderr.write("\n");
+      }
+
+      const estimate = estimateCost(items, opts.model);
+      process.stderr.write(`\n${formatCost(estimate)}\n\n`);
+
+      if (!opts.dryRun) {
+        process.stderr.write(`  Run without --estimate to process.\n\n`);
+      }
+      process.exit(0);
+    }
+
+    // Check for API key (after estimate/dry-run which don't need it)
     if (!process.env.ANTHROPIC_API_KEY) {
       process.stderr.write(
         `\n${pc.bold(pc.red("No API key found."))}\n\n` +
@@ -79,19 +135,6 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
 
     const provider = new AnthropicProvider();
     const concurrency = parseInt(opts.concurrency, 10) || 5;
-
-    // Try joining args as a single path if individual files aren't found
-    // Handles unquoted filenames with spaces: media2md Screenshot 2026-02-13 at 17.07.21.png
-    const resolvedFiles = await resolveFileArgs(files);
-
-    // Discover files
-    const imagePaths = await discoverImages(resolvedFiles, { recursive: opts.recursive });
-
-    if (imagePaths.length === 0) {
-      logger.warn("No supported images found.");
-      process.exit(0);
-    }
-
     const toStdout = opts.stdout === true;
 
     if (toStdout) {
