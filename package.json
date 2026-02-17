@@ -1,0 +1,52 @@
+{
+  "name": "media2md",
+  "version": "0.1.0",
+  "description": "Convert images to structured markdown with AI-generated descriptions and extracted text",
+  "type": "module",
+  "bin": {
+    "media2md": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "scripts"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "keywords": [
+    "markdown",
+    "image",
+    "ai",
+    "claude",
+    "vision",
+    "ocr",
+    "screenshot"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "commander": "^13.1.0",
+    "image-size": "^2.0.1",
+    "ora": "^8.1.1",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsup": "^8.3.6",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
