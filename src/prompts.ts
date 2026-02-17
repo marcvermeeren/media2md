@@ -1,5 +1,6 @@
-export function buildSystemPrompt(persona?: string): string {
-  const base = `You are an expert image analyst. Your task is to analyze images and provide:
+import { BUILTIN_PERSONAS } from "./personas/builtins.js";
+
+const BASE_SYSTEM_PROMPT = `You are an expert image analyst. Your task is to analyze images and provide:
 1. A clear, detailed description of the image content
 2. Any text visible in the image, extracted accurately
 
@@ -19,10 +20,23 @@ Important guidelines:
 - Extract ALL visible text, maintaining original formatting where possible
 - If text is partially obscured or unclear, indicate this with [unclear] markers`;
 
-  if (persona) {
-    return `${base}\n\nAdditional context: ${persona}`;
+export function buildSystemPrompt(persona?: string, customPrompt?: string): string {
+  // Custom --prompt overrides everything
+  if (customPrompt) {
+    return `${BASE_SYSTEM_PROMPT}\n\n${customPrompt}`;
   }
-  return base;
+
+  // Named persona
+  if (persona && persona in BUILTIN_PERSONAS) {
+    return `${BASE_SYSTEM_PROMPT}\n\n${BUILTIN_PERSONAS[persona].modifier}`;
+  }
+
+  // Freeform persona string (backwards compat)
+  if (persona) {
+    return `${BASE_SYSTEM_PROMPT}\n\nAdditional context: ${persona}`;
+  }
+
+  return BASE_SYSTEM_PROMPT;
 }
 
 export function buildUserPrompt(filename: string, format: string): string {

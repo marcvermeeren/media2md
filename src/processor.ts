@@ -16,6 +16,8 @@ import { DEFAULT_TEMPLATE } from "./templates/builtins.js";
 export interface ProcessOptions {
   model?: string;
   persona?: string;
+  prompt?: string;
+  template?: string;
   provider: Provider;
 }
 
@@ -57,7 +59,7 @@ export async function processFile(
   }
 
   // Build prompts
-  const systemPrompt = buildSystemPrompt(options.persona);
+  const systemPrompt = buildSystemPrompt(options.persona, options.prompt);
   const userPrompt = buildUserPrompt(metadata.filename, metadata.format);
 
   // Call provider
@@ -82,21 +84,29 @@ export async function processFile(
       ? `${metadata.width}x${metadata.height}`
       : "unknown";
 
+  const now = new Date();
   const vars: Record<string, string> = {
     filename: metadata.filename,
     basename: metadata.basename,
     format: metadata.format,
     dimensions,
+    width: metadata.width?.toString() ?? "unknown",
+    height: metadata.height?.toString() ?? "unknown",
     sizeHuman: metadata.sizeHuman,
+    sizeBytes: metadata.sizeBytes.toString(),
     sha256: metadata.sha256,
-    processedDate: new Date().toISOString().split("T")[0],
+    processedDate: now.toISOString().split("T")[0],
+    datetime: now.toISOString(),
     model: options.model ?? "default",
+    persona: options.persona ?? "",
+    sourcePath: `./${metadata.filename}`,
     description,
     extractedText: extractedTextFormatted,
   };
 
   // Render template
-  const markdown = renderTemplate(DEFAULT_TEMPLATE, vars);
+  const template = options.template ?? DEFAULT_TEMPLATE;
+  const markdown = renderTemplate(template, vars);
 
   return { description, extractedText, metadata, markdown };
 }

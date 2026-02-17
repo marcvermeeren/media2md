@@ -1,8 +1,14 @@
 import { Command } from "commander";
+import { resolve } from "node:path";
+import { stat } from "node:fs/promises";
 import pc from "picocolors";
 import { processFile } from "./processor.js";
 import { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 import { getSupportedFormats } from "./extractors/metadata.js";
+import { loadTemplate } from "./templates/loader.js";
+import { getPersonaNames } from "./personas/builtins.js";
+import { discoverImages, runBatch, type BatchResult } from "./batch.js";
+import { sidecarPath, writeMarkdown } from "./output/writer.js";
 import * as logger from "./utils/logger.js";
 
 const program = new Command();
@@ -11,18 +17,32 @@ program
   .name("media2md")
   .description("Convert images to structured markdown with AI vision")
   .version("0.1.0")
-  .argument("<file>", "Image file to process")
+  .argument("<files...>", "Image file(s) or directory to process")
   .option("-m, --model <model>", "AI model to use", DEFAULT_ANTHROPIC_MODEL)
-  .option("-p, --persona <persona>", "Additional context for the AI analyst")
+  .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
+  .option("--prompt <prompt>", "Custom prompt (overrides persona)")
+  .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
+  .option("-o, --output <dir>", "Output directory for .md files (default: next to image)")
+  .option("-r, --recursive", "Recursively scan directories")
+  .option("--stdout", "Output to stdout instead of writing files")
+  .option("--concurrency <n>", "Max concurrent API calls", "5")
   .option("-v, --verbose", "Show detailed processing info")
   .addHelpText(
     "after",
     `
 ${pc.bold("Examples:")}
-  ${pc.dim("$")} media2md screenshot.png
-  ${pc.dim("$")} media2md photo.jpg --model claude-opus-4-6
-  ${pc.dim("$")} media2md diagram.png --persona "Focus on architecture patterns"
-  ${pc.dim("$")} media2md screenshot.png | pbcopy
+  ${pc.dim("$")} media2md screenshot.png                     ${pc.dim("# writes screenshot.md next to it")}
+  ${pc.dim("$")} media2md screenshot.png -o ./docs/           ${pc.dim("# writes to docs/screenshot.md")}
+  ${pc.dim("$")} media2md screenshot.png --stdout              ${pc.dim("# print to stdout")}
+  ${pc.dim("$")} media2md screenshot.png --stdout | pbcopy     ${pc.dim("# copy to clipboard")}
+  ${pc.dim("$")} media2md ./assets/                           ${pc.dim("# batch, .md next to each image")}
+  ${pc.dim("$")} media2md ./assets/ -r -o ./docs/             ${pc.dim("# recursive, output dir")}
+  ${pc.dim("$")} media2md photo.jpg --persona brand           ${pc.dim("# brand analyst lens")}
+  ${pc.dim("$")} media2md diagram.png --template minimal      ${pc.dim("# minimal output")}
+
+${pc.bold("Personas:")} ${getPersonaNames().join(", ")}
+
+${pc.bold("Templates:")} default, minimal, alt-text, detailed, or path to .md file
 
 ${pc.bold("Environment:")}
   ANTHROPIC_API_KEY    Your Anthropic API key (required)
@@ -31,7 +51,7 @@ ${pc.bold("Environment:")}
 ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
 `
   )
-  .action(async (file: string, opts: { model: string; persona?: string; verbose?: boolean }) => {
+  .action(async (files: string[], opts) => {
     // Check for API key
     if (!process.env.ANTHROPIC_API_KEY) {
       process.stderr.write(
@@ -46,55 +66,119 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
       process.exit(1);
     }
 
-    const provider = new AnthropicProvider();
-
+    // Load template
+    let template: string;
     try {
-      logger.startSpinner("Analyzing image...");
-
-      const result = await processFile(file, {
-        model: opts.model,
-        persona: opts.persona,
-        provider,
-      });
-
-      logger.succeedSpinner(
-        `Processed ${pc.bold(result.metadata.filename)} (${result.metadata.sizeHuman})`
-      );
-
-      if (opts.verbose) {
-        logger.info(`Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height}`);
-        logger.info(`Model: ${opts.model}`);
-        logger.info(`Extracted ${result.extractedText.length} text segments`);
-      }
-
-      // Output markdown to stdout (only thing that goes to stdout)
-      process.stdout.write(result.markdown);
+      template = await loadTemplate(opts.template);
     } catch (err) {
-      logger.stopSpinner();
+      logger.error((err as Error).message);
+      process.exit(1);
+    }
 
-      if (err instanceof Error) {
-        const msg = err.message;
+    const provider = new AnthropicProvider();
+    const concurrency = parseInt(opts.concurrency, 10) || 5;
 
-        // Anthropic SDK error handling
-        if ("status" in err) {
-          const status = (err as { status: number }).status;
-          if (status === 401) {
-            logger.error("Invalid API key. Check your ANTHROPIC_API_KEY.");
-          } else if (status === 400) {
-            logger.error(`API rejected the request: ${msg}`);
-          } else if (status === 403) {
-            logger.error(`Access denied: ${msg}`);
-          } else {
-            logger.error(`API error (${status}): ${msg}`);
+    // Try joining args as a single path if individual files aren't found
+    // Handles unquoted filenames with spaces: media2md Screenshot 2026-02-13 at 17.07.21.png
+    const resolvedFiles = await resolveFileArgs(files);
+
+    // Discover files
+    const imagePaths = await discoverImages(resolvedFiles, { recursive: opts.recursive });
+
+    if (imagePaths.length === 0) {
+      logger.warn("No supported images found.");
+      process.exit(0);
+    }
+
+    const toStdout = opts.stdout === true;
+
+    if (toStdout) {
+      // Stdout mode
+      const results: BatchResult[] = [];
+      let processed = 0;
+
+      for (const filePath of imagePaths) {
+        const filename = filePath.split("/").pop() ?? filePath;
+        try {
+          logger.startSpinner(`Analyzing ${filename}...`);
+
+          const result = await processFile(filePath, {
+            model: opts.model,
+            persona: opts.persona,
+            prompt: opts.prompt,
+            template,
+            provider,
+          });
+
+          logger.succeedSpinner(`Analyzed ${filename}`);
+          processed++;
+          results.push({ file: filePath, success: true });
+
+          process.stdout.write(result.markdown);
+          if (imagePaths.length > 1) {
+            process.stdout.write("\n---\n\n");
           }
-        } else {
-          logger.error(msg);
+        } catch (err) {
+          logger.stopSpinner();
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          results.push({ file: filePath, success: false, error: msg });
+          logger.error(`${filename}: ${msg}`);
         }
-      } else {
-        logger.error("An unexpected error occurred.");
       }
 
-      process.exit(1);
+      const failed = results.filter((r) => !r.success).length;
+      if (failed > 0) process.exit(2);
+    } else {
+      // Sidecar mode (default) — sequential for clean spinner output
+      const total = imagePaths.length;
+      const results: BatchResult[] = [];
+
+      for (let i = 0; i < imagePaths.length; i++) {
+        const filePath = imagePaths[i];
+        const filename = filePath.split("/").pop() ?? filePath;
+        const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
+
+        try {
+          logger.startSpinner(`${prefix}Analyzing ${filename}...`);
+
+          const result = await processFile(filePath, {
+            model: opts.model,
+            persona: opts.persona,
+            prompt: opts.prompt,
+            template,
+            provider,
+          });
+
+          const outPath = sidecarPath(filePath, opts.output);
+          const outName = outPath.split("/").pop() ?? outPath;
+          logger.updateSpinner(`${prefix}Writing ${outName}...`);
+          await writeMarkdown(result.markdown, outPath);
+
+          results.push({ file: filePath, success: true, outputPath: outPath });
+          logger.succeedSpinner(`${prefix}${filename} → ${outName}`);
+
+          if (opts.verbose) {
+            logger.info(`  Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height} | ${result.metadata.sizeHuman}`);
+            logger.info(`  Extracted ${result.extractedText.length} text segments`);
+          }
+        } catch (err) {
+          logger.stopSpinner();
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          results.push({ file: filePath, success: false, error: msg });
+          handleError(err);
+        }
+      }
+
+      // Summary
+      const succeeded = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+
+      if (failed === 0) {
+        logger.success(`Done. ${succeeded} file${succeeded > 1 ? "s" : ""} processed.`);
+      } else {
+        logger.warn(`Done. ${succeeded} processed, ${failed} failed.`);
+        process.exit(2);
+      }
     }
   });
 
@@ -140,5 +224,52 @@ program
       process.exit(1);
     }
   });
+
+async function resolveFileArgs(args: string[]): Promise<string[]> {
+  if (args.length <= 1) return args;
+
+  // Check if individual args exist as files/dirs
+  const checks = await Promise.all(
+    args.map(async (a) => {
+      const s = await stat(resolve(a)).catch(() => null);
+      return s !== null;
+    })
+  );
+
+  // If all args resolve individually, use them as-is
+  if (checks.every(Boolean)) return args;
+
+  // If none resolve, try joining them as a single path (spaces in filename)
+  if (checks.every((c) => !c)) {
+    const joined = args.join(" ");
+    const s = await stat(resolve(joined)).catch(() => null);
+    if (s !== null) return [joined];
+  }
+
+  // Mixed: return as-is, let downstream handle missing files
+  return args;
+}
+
+function handleError(err: unknown): void {
+  if (err instanceof Error) {
+    const msg = err.message;
+    if ("status" in err) {
+      const status = (err as { status: number }).status;
+      if (status === 401) {
+        logger.error("Invalid API key. Check your ANTHROPIC_API_KEY.");
+      } else if (status === 400) {
+        logger.error(`API rejected the request: ${msg}`);
+      } else if (status === 403) {
+        logger.error(`Access denied: ${msg}`);
+      } else {
+        logger.error(`API error (${status}): ${msg}`);
+      }
+    } else {
+      logger.error(msg);
+    }
+  } else {
+    logger.error("An unexpected error occurred.");
+  }
+}
 
 program.parse();

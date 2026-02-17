@@ -2,7 +2,11 @@ export { processFile, type ProcessOptions, type ProcessResult } from "./processo
 export { extractMetadata, isSupportedFormat, getSupportedFormats, mimeTypeFromExtension, type ImageMetadata, type ExtractResult } from "./extractors/metadata.js";
 export { parseResponse, type ParsedResponse } from "./parser.js";
 export { renderTemplate } from "./templates/engine.js";
-export { DEFAULT_TEMPLATE } from "./templates/builtins.js";
+export { DEFAULT_TEMPLATE, MINIMAL_TEMPLATE, ALT_TEXT_TEMPLATE, DETAILED_TEMPLATE, BUILTIN_TEMPLATES } from "./templates/builtins.js";
+export { loadTemplate } from "./templates/loader.js";
 export { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
+export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/builtins.js";
+export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
+export { sidecarPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 export type { Provider, ImageInput, AnalyzeOptions, ProviderResponse } from "./providers/types.js";
