@@ -14,7 +14,7 @@ const TEST_CACHE_DIR = join(import.meta.dirname, "fixtures", "tmp-cache");
 
 // Point cache to a test directory
 beforeEach(async () => {
-  process.env.MEDIA2MD_CACHE_DIR = TEST_CACHE_DIR;
+  process.env.M2MD_CACHE_DIR = TEST_CACHE_DIR;
   await rm(TEST_CACHE_DIR, { recursive: true, force: true });
 });
 

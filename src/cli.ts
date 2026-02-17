@@ -14,13 +14,19 @@ import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/sto
 import { extractMetadata } from "./extractors/metadata.js";
 import { estimateCost, formatCost } from "./cost.js";
 import * as logger from "./utils/logger.js";
+import { brand, accent } from "./utils/logger.js";
 
 const program = new Command();
 
 program
-  .name("media2md")
+  .name("m2md")
   .description("Convert images to structured markdown with AI vision")
-  .version("0.1.0")
+  .configureOutput({
+    writeOut: (str) => process.stderr.write(str),
+    writeErr: (str) => process.stderr.write(str),
+    outputError: (str) => process.stderr.write(str),
+  })
+  .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.1.0")}\n`)
   .argument("<files...>", "Image file(s) or directory to process")
   .option("-m, --model <model>", "AI model to use", DEFAULT_ANTHROPIC_MODEL)
   .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
@@ -37,25 +43,25 @@ program
   .addHelpText(
     "after",
     `
-${pc.bold("Examples:")}
-  ${pc.dim("$")} media2md screenshot.png                     ${pc.dim("# writes screenshot.md next to it")}
-  ${pc.dim("$")} media2md screenshot.png -o ./docs/           ${pc.dim("# writes to docs/screenshot.md")}
-  ${pc.dim("$")} media2md screenshot.png --stdout              ${pc.dim("# print to stdout")}
-  ${pc.dim("$")} media2md screenshot.png --stdout | pbcopy     ${pc.dim("# copy to clipboard")}
-  ${pc.dim("$")} media2md ./assets/                           ${pc.dim("# batch, .md next to each image")}
-  ${pc.dim("$")} media2md ./assets/ -r -o ./docs/             ${pc.dim("# recursive, output dir")}
-  ${pc.dim("$")} media2md photo.jpg --persona brand           ${pc.dim("# brand analyst lens")}
-  ${pc.dim("$")} media2md diagram.png --template minimal      ${pc.dim("# minimal output")}
+${brand(pc.bold("Examples:"))}
+  ${pc.dim("$")} m2md screenshot.png                     ${pc.dim("# writes screenshot.md next to it")}
+  ${pc.dim("$")} m2md screenshot.png -o ./docs/           ${pc.dim("# writes to docs/screenshot.md")}
+  ${pc.dim("$")} m2md screenshot.png --stdout              ${pc.dim("# print to stdout")}
+  ${pc.dim("$")} m2md screenshot.png --stdout | pbcopy     ${pc.dim("# copy to clipboard")}
+  ${pc.dim("$")} m2md ./assets/                           ${pc.dim("# batch, .md next to each image")}
+  ${pc.dim("$")} m2md ./assets/ -r -o ./docs/             ${pc.dim("# recursive, output dir")}
+  ${pc.dim("$")} m2md photo.jpg --persona brand           ${pc.dim("# brand analyst lens")}
+  ${pc.dim("$")} m2md diagram.png --template minimal      ${pc.dim("# minimal output")}
 
-${pc.bold("Personas:")} ${getPersonaNames().join(", ")}
+${brand(pc.bold("Personas:"))} ${getPersonaNames().map((n) => accent(n)).join(pc.dim(", "))}
 
-${pc.bold("Templates:")} default, minimal, alt-text, detailed, or path to .md file
+${brand(pc.bold("Templates:"))} ${["default", "minimal", "alt-text", "detailed"].map((n) => accent(n)).join(pc.dim(", "))}${pc.dim(", or path to .md file")}
 
-${pc.bold("Environment:")}
-  ANTHROPIC_API_KEY    Your Anthropic API key (required)
-                       Get one at ${pc.underline("https://console.anthropic.com/settings/keys")}
+${brand(pc.bold("Environment:"))}
+  ${pc.bold("ANTHROPIC_API_KEY")}    Your Anthropic API key ${pc.dim("(required)")}
+                       Get one at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}
 
-${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
+${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.dim(f)).join(", ")}
 `
   )
   .action(async (files: string[], cliOpts) => {
@@ -64,14 +70,16 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
     const opts = mergeOptions(cliOpts, config);
 
     // Try joining args as a single path if individual files aren't found
-    // Handles unquoted filenames with spaces: media2md Screenshot 2026-02-13 at 17.07.21.png
+    // Handles unquoted filenames with spaces: m2md Screenshot 2026-02-13 at 17.07.21.png
     const resolvedFiles = await resolveFileArgs(files);
 
     // Discover files
     const imagePaths = await discoverImages(resolvedFiles, { recursive: opts.recursive });
 
     if (imagePaths.length === 0) {
+      logger.blank();
       logger.warn("No supported images found.");
+      logger.blank();
       process.exit(0);
     }
 
@@ -92,35 +100,40 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
       }
 
       if (opts.dryRun) {
-        process.stderr.write(`\n${pc.bold("Dry run — files that would be processed:")}\n\n`);
+        logger.header("Dry run");
         for (const item of items) {
-          const status = item.cached ? pc.dim("(cached)") : pc.green("(new)");
+          const status = item.cached ? pc.dim("cached") : pc.green("new");
           const name = item.path.split("/").pop() ?? item.path;
-          process.stderr.write(`  ${name} ${status}  ${pc.dim(item.metadata.sizeHuman)}\n`);
+          process.stderr.write(`  ${accent(name)} ${pc.dim("·")} ${status} ${pc.dim("·")} ${pc.dim(item.metadata.sizeHuman)}\n`);
         }
-        process.stderr.write("\n");
       }
 
       const estimate = estimateCost(items, opts.model);
-      process.stderr.write(`\n${formatCost(estimate)}\n\n`);
+      logger.blank();
+      logger.summary(formatCost(estimate).split("\n"));
 
       if (!opts.dryRun) {
-        process.stderr.write(`  Run without --estimate to process.\n\n`);
+        logger.info(`Run without ${brand("--estimate")} to process.`);
+        logger.blank();
       }
       process.exit(0);
     }
 
     // Check for API key (after estimate/dry-run which don't need it)
     if (!process.env.ANTHROPIC_API_KEY) {
-      process.stderr.write(
-        `\n${pc.bold(pc.red("No API key found."))}\n\n` +
-          `media2md requires an Anthropic API key to analyze images.\n\n` +
-          `${pc.bold("Quick setup:")}\n` +
-          `  1. Get a key at ${pc.underline("https://console.anthropic.com/settings/keys")}\n` +
-          `  2. Add to your shell profile:\n\n` +
-          `     ${pc.cyan('export ANTHROPIC_API_KEY="sk-ant-..."')}\n\n` +
-          `  Or run: ${pc.cyan("media2md setup")}\n\n`
-      );
+      logger.blank();
+      process.stderr.write(`  ${pc.bold(pc.red("No API key found."))}\n`);
+      logger.blank();
+      process.stderr.write(`  m2md requires an Anthropic API key to analyze images.\n`);
+      logger.blank();
+      process.stderr.write(`  ${brand(pc.bold("Quick setup:"))}\n`);
+      process.stderr.write(`  ${pc.dim("1.")} Get a key at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
+      process.stderr.write(`  ${pc.dim("2.")} Add to your shell profile:\n`);
+      logger.blank();
+      process.stderr.write(`     ${brand('export ANTHROPIC_API_KEY="sk-ant-..."')}\n`);
+      logger.blank();
+      process.stderr.write(`  Or run: ${brand("m2md setup")}\n`);
+      logger.blank();
       process.exit(1);
     }
 
@@ -140,12 +153,12 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
     if (toStdout) {
       // Stdout mode
       const results: BatchResult[] = [];
-      let processed = 0;
 
+      logger.blank();
       for (const filePath of imagePaths) {
         const filename = filePath.split("/").pop() ?? filePath;
         try {
-          logger.startSpinner(`Analyzing ${filename}...`);
+          logger.startSpinner(`Analyzing ${accent(filename)}`);
 
           const result = await processFile(filePath, {
             model: opts.model,
@@ -157,8 +170,7 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
             provider,
           });
 
-          logger.succeedSpinner(result.cached ? `${filename} (cached)` : `Analyzed ${filename}`);
-          processed++;
+          logger.succeedSpinner(result.cached ? `${filename} ${pc.dim("(cached)")}` : filename);
           results.push({ file: filePath, success: true });
 
           process.stdout.write(result.markdown);
@@ -174,19 +186,22 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
       }
 
       const failed = results.filter((r) => !r.success).length;
+      logger.blank();
       if (failed > 0) process.exit(2);
     } else {
       // Sidecar mode (default) — sequential for clean spinner output
       const total = imagePaths.length;
-      const results: BatchResult[] = [];
+      const results: (BatchResult & { cached?: boolean })[] = [];
+      const startTime = Date.now();
 
+      logger.blank();
       for (let i = 0; i < imagePaths.length; i++) {
         const filePath = imagePaths[i];
         const filename = filePath.split("/").pop() ?? filePath;
-        const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
+        const prefix = total > 1 ? `${pc.dim(`[${i + 1}/${total}]`)} ` : "";
 
         try {
-          logger.startSpinner(`${prefix}Analyzing ${filename}...`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(filename)}`);
 
           const result = await processFile(filePath, {
             model: opts.model,
@@ -199,23 +214,22 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
           });
 
           const outPath = sidecarPath(filePath, opts.output);
-          const outName = outPath.split("/").pop() ?? outPath;
 
           if (!result.cached) {
-            logger.updateSpinner(`${prefix}Writing ${outName}...`);
+            logger.updateSpinner(`${prefix}Writing ${accent(filename)}`);
           }
           await writeMarkdown(result.markdown, outPath);
 
-          results.push({ file: filePath, success: true, outputPath: outPath });
+          results.push({ file: filePath, success: true, outputPath: outPath, cached: result.cached });
           logger.succeedSpinner(
             result.cached
-              ? `${prefix}${filename} → ${outName} (cached)`
-              : `${prefix}${filename} → ${outName}`
+              ? `${prefix}${filename} ${pc.dim("→ .md (cached)")}`
+              : `${prefix}${filename} ${pc.dim("→ .md")}`
           );
 
           if (opts.verbose) {
-            logger.info(`  Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height} | ${result.metadata.sizeHuman}`);
-            logger.info(`  Extracted ${result.extractedText.length} text segments`);
+            logger.info(`Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height} | ${result.metadata.sizeHuman}`);
+            logger.info(`Extracted ${result.extractedText.length} text segments`);
           }
         } catch (err) {
           logger.stopSpinner();
@@ -228,13 +242,20 @@ ${pc.bold("Supported formats:")} ${getSupportedFormats().join(", ")}
       // Summary
       const succeeded = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success).length;
+      const cachedCount = results.filter((r) => r.cached).length;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
+      logger.blank();
       if (failed === 0) {
-        logger.success(`Done. ${succeeded} file${succeeded > 1 ? "s" : ""} processed.`);
+        const parts = [`${brand(succeeded.toString())} file${succeeded > 1 ? "s" : ""} processed`];
+        if (cachedCount > 0) parts.push(`${pc.dim(`${cachedCount} from cache`)}`);
+        parts.push(pc.dim(`${elapsed}s`));
+        logger.success(parts.join(pc.dim(" · ")));
       } else {
-        logger.warn(`Done. ${succeeded} processed, ${failed} failed.`);
+        logger.warn(`${succeeded} processed, ${failed} failed ${pc.dim(`· ${elapsed}s`)}`);
         process.exit(2);
       }
+      logger.blank();
     }
   });
 
@@ -243,7 +264,7 @@ program
   .command("setup")
   .description("Configure API key and verify setup")
   .action(async () => {
-    process.stderr.write(`\n${pc.bold("media2md setup")}\n\n`);
+    logger.header("m2md setup");
 
     if (process.env.ANTHROPIC_API_KEY) {
       logger.success("ANTHROPIC_API_KEY is set");
@@ -258,25 +279,29 @@ program
           messages: [{ role: "user", content: "Hi" }],
         });
         logger.succeedSpinner("API key is valid");
-        process.stderr.write(`\n${pc.green("You're all set!")} Try: ${pc.cyan("media2md <image>")}\n\n`);
+        logger.blank();
+        process.stderr.write(`  ${pc.green("You're all set!")} Try: ${brand("m2md <image>")}\n`);
+        logger.blank();
       } catch {
         logger.stopSpinner();
         logger.error("API key is invalid or expired");
-        process.stderr.write(
-          `\nGet a new key at ${pc.underline("https://console.anthropic.com/settings/keys")}\n\n`
-        );
+        logger.blank();
+        process.stderr.write(`  Get a new key at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
+        logger.blank();
         process.exit(1);
       }
     } else {
       logger.warn("ANTHROPIC_API_KEY is not set");
-      process.stderr.write(
-        `\n${pc.bold("To set up:")}\n` +
-          `  1. Get a key at ${pc.underline("https://console.anthropic.com/settings/keys")}\n` +
-          `  2. Add to your shell profile (~/.zshrc or ~/.bashrc):\n\n` +
-          `     ${pc.cyan('export ANTHROPIC_API_KEY="sk-ant-..."')}\n\n` +
-          `  3. Reload your shell: ${pc.cyan("source ~/.zshrc")}\n` +
-          `  4. Verify: ${pc.cyan("media2md setup")}\n\n`
-      );
+      logger.blank();
+      process.stderr.write(`  ${brand(pc.bold("To set up:"))}\n`);
+      process.stderr.write(`  ${pc.dim("1.")} Get a key at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
+      process.stderr.write(`  ${pc.dim("2.")} Add to your shell profile ${pc.dim("(~/.zshrc or ~/.bashrc)")}:\n`);
+      logger.blank();
+      process.stderr.write(`     ${brand('export ANTHROPIC_API_KEY="sk-ant-..."')}\n`);
+      logger.blank();
+      process.stderr.write(`  ${pc.dim("3.")} Reload your shell: ${brand("source ~/.zshrc")}\n`);
+      process.stderr.write(`  ${pc.dim("4.")} Verify: ${brand("m2md setup")}\n`);
+      logger.blank();
       process.exit(1);
     }
   });
@@ -289,10 +314,12 @@ cacheCmd
   .description("Show cache stats")
   .action(async () => {
     const stats = await getCacheStats();
-    process.stderr.write(`\n${pc.bold("Cache status")}\n\n`);
-    process.stderr.write(`  Entries:   ${stats.entries}\n`);
-    process.stderr.write(`  Size:      ${stats.sizeHuman}\n`);
-    process.stderr.write(`  Location:  ${pc.dim(stats.cacheDir)}\n\n`);
+    logger.header("Cache");
+    logger.summary([
+      `  Entries   ${brand(String(stats.entries))}`,
+      `  Size      ${brand(stats.sizeHuman)}`,
+      `  Location  ${pc.dim(stats.cacheDir)}`,
+    ]);
   });
 
 cacheCmd
@@ -300,11 +327,13 @@ cacheCmd
   .description("Clear all cached results")
   .action(async () => {
     const count = await clearCache();
+    logger.blank();
     if (count > 0) {
-      logger.success(`Cleared ${count} cached result${count > 1 ? "s" : ""}.`);
+      logger.success(`Cleared ${brand(String(count))} cached result${count > 1 ? "s" : ""}.`);
     } else {
       logger.info("Cache is already empty.");
     }
+    logger.blank();
   });
 
 async function resolveFileArgs(args: string[]): Promise<string[]> {

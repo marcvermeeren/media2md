@@ -1,10 +1,10 @@
 {
-  "name": "media2md",
+  "name": "m2md",
   "version": "0.1.0",
   "description": "Convert images to structured markdown with AI-generated descriptions and extracted text",
   "type": "module",
   "bin": {
-    "media2md": "./dist/cli.js"
+    "m2md": "./dist/cli.js"
   },
   "exports": {
     ".": {

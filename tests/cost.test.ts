@@ -95,8 +95,8 @@ describe("formatCost", () => {
     expect(output).toContain("2 images");
     expect(output).toContain("1 cached");
     expect(output).toContain("1 new");
-    expect(output).toContain("input");
-    expect(output).toContain("output");
+    expect(output).toContain(" in ");
+    expect(output).toContain(" out");
     expect(output).toContain("$");
   });
 

@@ -1,4 +1,4 @@
-# media2md — Implementation Status
+# m2md — Implementation Status
 
 ## Implemented
 
@@ -11,9 +11,9 @@
 - [x] All UI output to stderr, only markdown to stdout
 
 ### CLI
-- [x] `media2md <file>` — sidecar mode by default (writes .md next to image)
-- [x] `media2md <dir>` — batch processing with sequential spinners
-- [x] `media2md setup` — API key check and verification
+- [x] `m2md <file>` — sidecar mode by default (writes .md next to image)
+- [x] `m2md <dir>` — batch processing with sequential spinners
+- [x] `m2md setup` — API key check and verification
 - [x] `--stdout` — output to stdout instead of writing files
 - [x] `-o <dir>` — custom output directory
 - [x] `-r` — recursive directory scanning
@@ -45,14 +45,14 @@
 - [x] `marketing` — CTAs, conversion, audience targeting
 
 ### Caching
-- [x] Hash-based cache in `~/.cache/media2md/`
+- [x] Hash-based cache in `~/.cache/m2md/`
 - [x] Cache key = content hash + model + persona + prompt + template
 - [x] `cache status` — entry count, size, location
 - [x] `cache clear` — wipe all cached results
-- [x] Respects `XDG_CACHE_HOME` and `MEDIA2MD_CACHE_DIR`
+- [x] Respects `XDG_CACHE_HOME` and `M2MD_CACHE_DIR`
 
 ### Config
-- [x] Config file via cosmiconfig (`media2md.config.json`, `.media2mdrc`, etc.)
+- [x] Config file via cosmiconfig (`m2md.config.json`, `.m2mdrc`, etc.)
 - [x] CLI flags take precedence over config values
 
 ### Cost Estimation
@@ -73,13 +73,19 @@
 - [ ] Ollama / local models (`--provider ollama --model llava`)
 - [ ] `--provider` flag in CLI
 
+### Output Quality
+- [ ] Refine system prompts for optimal machine-readable output (structured for LLM/AI consumption)
+- [ ] Optimize frontmatter schema for downstream AI pipelines
+- [ ] Persona prompt tuning (sharper, more consistent output per role)
+- [ ] Extracted text formatting improvements (tables, code blocks, lists)
+
 ### Features
-- [ ] Watch mode (`media2md watch ./assets/`)
+- [ ] Watch mode (`m2md watch ./assets/`)
 - [ ] `--no-frontmatter` flag
 - [ ] Custom filename patterns (`--name "{date}-{filename}"`)
 - [ ] Batch API (async 50% cheaper processing)
 - [ ] Smart two-pass mode (cheap model first, quality for uncertain)
-- [ ] Comparison mode (`media2md compare a.png b.png`)
+- [ ] Comparison mode (`m2md compare a.png b.png`)
 
 ### Media Types
 - [ ] PDF support

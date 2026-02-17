@@ -21,9 +21,9 @@ export interface CacheStats {
 }
 
 function getCacheDir(): string {
-  if (process.env.MEDIA2MD_CACHE_DIR) return process.env.MEDIA2MD_CACHE_DIR;
-  if (process.env.XDG_CACHE_HOME) return join(process.env.XDG_CACHE_HOME, "media2md");
-  return join(homedir(), ".cache", "media2md");
+  if (process.env.M2MD_CACHE_DIR) return process.env.M2MD_CACHE_DIR;
+  if (process.env.XDG_CACHE_HOME) return join(process.env.XDG_CACHE_HOME, "m2md");
+  return join(homedir(), ".cache", "m2md");
 }
 
 function entryPath(key: string): string {

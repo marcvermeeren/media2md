@@ -70,14 +70,20 @@ export function estimateCost(
 export function formatCost(estimate: CostEstimate): string {
   const cost = estimate.estimatedCost;
   const costStr = cost < 0.01
-    ? `<$0.01`
+    ? "<$0.01"
     : `~$${cost.toFixed(2)}`;
 
+  const filesLabel = `${estimate.files} image${estimate.files !== 1 ? "s" : ""}`;
+  const cacheNote = estimate.cached > 0
+    ? ` (${estimate.cached} cached, ${estimate.toProcess} new)`
+    : "";
+
+  const modelShort = estimate.model.replace("claude-", "").split("-2")[0];
+
   const lines = [
-    `  Files to process: ${estimate.files} image${estimate.files !== 1 ? "s" : ""}` +
-      (estimate.cached > 0 ? ` (${estimate.cached} cached, ${estimate.toProcess} new)` : ""),
-    `  Estimated tokens: ~${estimate.totalInputTokens.toLocaleString()} input + ~${estimate.totalOutputTokens.toLocaleString()} output`,
-    `  Estimated cost:   ${costStr} (${estimate.model})`,
+    `  Files     ${filesLabel}${cacheNote}`,
+    `  Tokens    ~${estimate.totalInputTokens.toLocaleString()} in + ~${estimate.totalOutputTokens.toLocaleString()} out`,
+    `  Cost      ${costStr} (${modelShort})`,
   ];
 
   return lines.join("\n");

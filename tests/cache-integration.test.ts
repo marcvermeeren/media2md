@@ -27,7 +27,7 @@ class CountingProvider implements Provider {
 }
 
 beforeEach(async () => {
-  process.env.MEDIA2MD_CACHE_DIR = TEST_CACHE_DIR;
+  process.env.M2MD_CACHE_DIR = TEST_CACHE_DIR;
   await rm(TEST_CACHE_DIR, { recursive: true, force: true });
 });
 

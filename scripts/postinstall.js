@@ -15,18 +15,27 @@ const bold = noColor ? "" : "\x1b[1m";
 const dim = noColor ? "" : "\x1b[2m";
 const cyan = noColor ? "" : "\x1b[36m";
 const green = noColor ? "" : "\x1b[32m";
-const yellow = noColor ? "" : "\x1b[33m";
+const magenta = noColor ? "" : "\x1b[35m";
+
+const line = noColor ? "────────────────────────────────────" : `${dim}────────────────────────────────────${reset}`;
 
 const msg = `
-${bold}${cyan}media2md${reset} installed successfully!
+  ${line}
 
-${dim}Convert images to structured markdown with AI vision.${reset}
+  ${bold}${cyan}m2md${reset} installed successfully
 
-${bold}Quick start:${reset}
-  ${green}media2md screenshot.png${reset}        ${dim}# outputs markdown to stdout${reset}
-  ${green}media2md setup${reset}                  ${dim}# configure your API key${reset}
+  ${dim}Convert images to structured markdown${reset}
+  ${dim}with AI vision.${reset}
 
-${yellow}Requires ANTHROPIC_API_KEY environment variable.${reset}
+  ${bold}${cyan}Quick start${reset}
+  ${dim}$${reset} ${green}m2md screenshot.png${reset}
+  ${dim}$${reset} ${green}m2md ./assets/ -r${reset}
+  ${dim}$${reset} ${green}m2md setup${reset}
+
+  ${dim}Requires${reset} ${magenta}ANTHROPIC_API_KEY${reset} ${dim}env variable.${reset}
+
+  ${line}
+
 `;
 
 process.stderr.write(msg);

@@ -1,6 +1,6 @@
 import { cosmiconfig } from "cosmiconfig";
 
-export interface Media2mdConfig {
+export interface M2mdConfig {
   model?: string;
   persona?: string;
   prompt?: string;
@@ -11,29 +11,29 @@ export interface Media2mdConfig {
   concurrency?: number;
 }
 
-const explorer = cosmiconfig("media2md", {
+const explorer = cosmiconfig("m2md", {
   searchPlaces: [
-    "media2md.config.json",
-    "media2md.config.js",
-    ".media2mdrc",
-    ".media2mdrc.json",
-    ".media2mdrc.yaml",
-    ".media2mdrc.yml",
+    "m2md.config.json",
+    "m2md.config.js",
+    ".m2mdrc",
+    ".m2mdrc.json",
+    ".m2mdrc.yaml",
+    ".m2mdrc.yml",
     "package.json",
   ],
 });
 
-let cachedConfig: Media2mdConfig | null = null;
+let cachedConfig: M2mdConfig | null = null;
 let loaded = false;
 
-export async function loadConfig(): Promise<Media2mdConfig> {
+export async function loadConfig(): Promise<M2mdConfig> {
   if (loaded) return cachedConfig ?? {};
 
   try {
     const result = await explorer.search();
     loaded = true;
     if (result && !result.isEmpty) {
-      cachedConfig = result.config as Media2mdConfig;
+      cachedConfig = result.config as M2mdConfig;
       return cachedConfig;
     }
   } catch {
@@ -50,7 +50,7 @@ export async function loadConfig(): Promise<Media2mdConfig> {
  */
 export function mergeOptions<T extends Record<string, unknown>>(
   cliOpts: T,
-  config: Media2mdConfig
+  config: M2mdConfig
 ): T {
   const merged = { ...cliOpts };
 
