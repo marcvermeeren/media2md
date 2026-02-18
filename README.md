@@ -273,6 +273,8 @@ m2md setup
 
 m2md includes an MCP server (`m2md-mcp`) that exposes a `describe_image` tool over stdio. This lets AI agents — like Claude Desktop or any MCP client — analyze images directly.
 
+The server **auto-detects API keys** from your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.zprofile`, `~/.bash_profile`, `~/.profile`), so you typically don't need to pass them explicitly. This is especially useful for GUI apps like Claude Desktop that don't inherit shell environment variables.
+
 ### Claude Desktop
 
 Add to your `claude_desktop_config.json`:
@@ -281,7 +283,21 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "m2md": {
-      "command": "m2md-mcp",
+      "command": "node",
+      "args": ["/path/to/m2md/dist/mcp.js"]
+    }
+  }
+}
+```
+
+If auto-detection doesn't find your key (e.g. it's set via a secrets manager), you can pass it explicitly:
+
+```json
+{
+  "mcpServers": {
+    "m2md": {
+      "command": "node",
+      "args": ["/path/to/m2md/dist/mcp.js"],
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-..."
       }
@@ -298,10 +314,7 @@ Add to your `.claude/settings.json`:
 {
   "mcpServers": {
     "m2md": {
-      "command": "m2md-mcp",
-      "env": {
-        "ANTHROPIC_API_KEY": "sk-ant-..."
-      }
+      "command": "m2md-mcp"
     }
   }
 }
