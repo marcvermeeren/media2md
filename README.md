@@ -160,22 +160,34 @@ m2md screenshot.png -v                               # verbose output
 
 ## Configuration
 
-Optional config file (`m2md.config.json`, `.m2mdrc`, `.m2mdrc.json`, `.m2mdrc.yaml`, or in `package.json` under `"m2md"` key):
+Drop a config file in any directory to set defaults for that project. This way you don't have to pass the same flags every time — just run `m2md ./assets/` and it picks up your settings.
+
+Create an `m2md.config.json` (or `.m2mdrc`, `.m2mdrc.json`, `.m2mdrc.yaml`) in your project root:
 
 ```json
 {
-  "model": "claude-sonnet-4-5-20250929",
   "persona": "design",
-  "note": "illustration references — capture style, palette, technique",
-  "template": "default",
+  "note": "capture style, palette, spacing tokens",
   "output": "./docs",
-  "recursive": true,
-  "cache": true,
-  "concurrency": 5
+  "recursive": true
 }
 ```
 
-CLI flags take precedence over config file values.
+All options are optional — only set what you want to override:
+
+| Key | What it does | Default |
+|-----|-------------|---------|
+| `model` | AI model to use | `claude-sonnet-4-5-20250929` |
+| `persona` | Built-in persona lens | none (base prompt) |
+| `prompt` | Custom prompt (overrides persona) | none |
+| `note` | Additive focus directive | none |
+| `template` | Output template | `default` |
+| `output` | Output directory for `.md` files | next to image |
+| `recursive` | Scan directories recursively | `false` |
+| `cache` | Cache results by content hash | `true` |
+| `concurrency` | Max parallel API calls | `5` |
+
+CLI flags always take precedence over config file values. You can also put config under an `"m2md"` key in `package.json`.
 
 ## Setup
 
