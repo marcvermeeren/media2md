@@ -68,7 +68,7 @@ export async function fetchImage(
   url: string
 ): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
   const response = await fetch(url, {
-    headers: { "User-Agent": "m2md/0.1.0" },
+    headers: { "User-Agent": "m2md/0.1.0 (https://github.com/marcvermeeren/m2md; image-to-markdown CLI tool)" },
     redirect: "follow",
   });
 

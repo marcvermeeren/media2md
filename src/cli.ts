@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { resolve } from "node:path";
-import { stat } from "node:fs/promises";
+import { stat, writeFile, mkdir } from "node:fs/promises";
 import pc from "picocolors";
 import { loadConfig, mergeOptions, resolveTier, TIER_MAP } from "./config.js";
 import { processFile, processBuffer } from "./processor.js";
@@ -311,10 +311,12 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
           logger.startSpinner(`${prefix}Analyzing ${accent(label)}${barLine}`);
 
           let result;
+          let fetchedBuffer: { buffer: Buffer; filename: string } | undefined;
           if (item.kind === "file") {
             result = await processFile(item.path, processOpts);
           } else {
             const fetched = await fetchUrl(item.url);
+            fetchedBuffer = fetched;
             result = await processBuffer(fetched, processOpts);
           }
 
@@ -340,10 +342,19 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
                 : `${prefix}${filename} ${pc.dim("→ .md")}`
             );
           } else {
-            // URL: write sidecar based on result filename, or output to current dir
+            // URL: save image + write sidecar .md to output dir or cwd
             const outDir = opts.output ?? ".";
+            await mkdir(resolve(outDir), { recursive: true });
+            const imgName = result.metadata.filename;
             const outName = result.metadata.basename + ".md";
+            const imgPath = resolve(outDir, imgName);
             const outPath = resolve(outDir, outName);
+
+            // Save the downloaded image
+            if (fetchedBuffer) {
+              await writeFile(imgPath, fetchedBuffer.buffer);
+            }
+
             if (!result.cached) {
               const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
               logger.updateSpinner(`${prefix}Writing ${accent(outName)}${writeBar}`);
@@ -352,8 +363,8 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
             results.push({ file: item.url, success: true, outputPath: outPath, cached: result.cached });
             logger.succeedSpinner(
               result.cached
-                ? `${prefix}${label} ${pc.dim(`→ ${outName} (cached)`)}`
-                : `${prefix}${label} ${pc.dim(`→ ${outName}`)}`
+                ? `${prefix}${label} ${pc.dim(`→ ${imgName} + ${outName} (cached)`)}`
+                : `${prefix}${label} ${pc.dim(`→ ${imgName} + ${outName}`)}`
             );
           }
 

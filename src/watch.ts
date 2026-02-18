@@ -115,19 +115,31 @@ export async function startWatch(
 
   // Graceful shutdown
   let watchCount = processed;
-  const shutdown = async () => {
-    logger.blank();
-    logger.info("Shutting down watcher...");
-    await watcher.close();
-    logger.success(
-      `Watch session complete: ${brand(String(watchCount))} file${watchCount !== 1 ? "s" : ""} processed`
-    );
-    logger.blank();
+  const shutdown = () => {
+    try {
+      logger.stopSpinner();
+      logger.blank();
+      logger.success(
+        `Watch session complete: ${brand(String(watchCount))} file${watchCount !== 1 ? "s" : ""} processed`
+      );
+      logger.blank();
+    } catch {}
+    watcher.close().catch(() => {});
     process.exit(0);
   };
 
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
+
+  // stdin-discarder (used by ora) can leave stdin in raw mode,
+  // swallowing the OS-level SIGINT. Listen for Ctrl+C bytes directly as backup.
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.on("data", (data: Buffer) => {
+      if (data[0] === 0x03) shutdown(); // Ctrl+C
+    });
+  }
 
   // Keep the process alive
   async function processOne(
