@@ -38,16 +38,24 @@ export function filenameFromUrl(url: string): string {
     const segments = parsed.pathname.split("/").filter(Boolean);
     if (segments.length > 0) {
       const last = segments[segments.length - 1];
-      // Decode and clean up
       const decoded = decodeURIComponent(last);
       if (decoded.includes(".")) return decoded;
       return decoded;
     }
+    // No path segments — use hostname as filename
+    return slugify(parsed.hostname);
   } catch {
     // fall through
   }
-  // Fallback: use host + hash
   return "image";
+}
+
+/** Turn a string into a safe filename slug */
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export function extensionFromMimeType(
@@ -116,14 +124,27 @@ export async function screenshotPage(
     );
   }
 
-  const browser = await pw.chromium.launch();
+  let browser;
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    browser = await pw.chromium.launch();
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 900 },
+      deviceScaleFactor: 2,
+    });
     await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
     const buffer = Buffer.from(await page.screenshot({ fullPage: true }));
-    const filename = filenameFromUrl(url).replace(/\.[^.]+$/, "") + ".png";
+
+    // Use page title for filename, fall back to URL hostname
+    const title = await page.title().catch(() => "");
+    const name = title ? slugify(title) : filenameFromUrl(url).replace(/\.[^.]+$/, "");
+    const filename = (name || "screenshot") + ".png";
     return { buffer, mimeType: "image/png", filename };
+  } catch (err) {
+    // Strip Playwright's verbose browser logs from error messages
+    const msg = (err as Error).message ?? String(err);
+    const clean = msg.split("\nBrowser logs:")[0].split("\n=====")[0].trim();
+    throw new Error(`Screenshot failed for ${url}: ${clean}`);
   } finally {
-    await browser.close();
+    await browser?.close().catch(() => {});
   }
 }

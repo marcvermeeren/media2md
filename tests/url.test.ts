@@ -65,7 +65,7 @@ describe("filenameFromUrl", () => {
     expect(filenameFromUrl("https://example.com/image")).toBe("image");
   });
 
-  it("falls back for root URLs", () => {
-    expect(filenameFromUrl("https://example.com/")).toBe("image");
+  it("uses hostname for root URLs", () => {
+    expect(filenameFromUrl("https://example.com/")).toBe("example-com");
   });
 });
