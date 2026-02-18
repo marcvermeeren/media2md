@@ -212,6 +212,23 @@ m2md ./assets/ --dry-run      # list files with cache status + estimates
 
 Both work without an API key so you can preview before committing.
 
+### Custom filenames
+
+Control the output `.md` filename with `--name`:
+
+```bash
+m2md screenshot.png --name "{date}-{filename}"        # 2026-02-18-screenshot.md
+m2md ./assets/ --name "{type}-{filename}"             # screenshot-hero.md, photo-team.md
+m2md shot.png --name "{date}-{subject}"               # 2026-02-18-dashboard-with-charts.md
+```
+
+| Placeholder | Description |
+|-------------|-------------|
+| `{filename}` | Original filename without extension |
+| `{date}` | Processing date (YYYY-MM-DD) |
+| `{type}` | AI-detected image type (screenshot, photo, diagram, etc.) |
+| `{subject}` | AI-generated subject line, slugified |
+
 ### Other flags
 
 ```bash

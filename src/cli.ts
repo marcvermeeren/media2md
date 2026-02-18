@@ -12,7 +12,7 @@ import { loadTemplate } from "./templates/loader.js";
 import { stripFrontmatter } from "./templates/engine.js";
 import { getPersonaNames } from "./personas/builtins.js";
 import { discoverImages, runBatch, type BatchResult } from "./batch.js";
-import { sidecarPath, writeMarkdown } from "./output/writer.js";
+import { sidecarPath, formatOutputPath, writeMarkdown } from "./output/writer.js";
 import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/store.js";
 import { extractMetadata } from "./extractors/metadata.js";
 import { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel } from "./cost.js";
@@ -40,6 +40,7 @@ program
   .option("-n, --note <note>", "Focus directive — additional aspects for the LLM to note")
   .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
   .option("-o, --output <dir>", "Output directory for .md files (default: next to image)")
+  .option("--name <pattern>", "Output filename pattern: {filename}, {date}, {type}, {subject}")
   .option("-r, --recursive", "Recursively scan directories")
   .option("--stdout", "Output to stdout instead of writing files")
   .option("--no-frontmatter", "Strip YAML frontmatter from output")
@@ -333,7 +334,13 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
           }
 
           if (item.kind === "file") {
-            const outPath = sidecarPath(item.path, opts.output);
+            const outPath = opts.name
+              ? formatOutputPath(item.path, opts.name as string, {
+                  date: result.metadata.processedDate ?? new Date().toISOString().split("T")[0],
+                  type: result.type,
+                  subject: result.subject,
+                }, opts.output)
+              : sidecarPath(item.path, opts.output);
             if (!result.cached) {
               const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
               logger.updateSpinner(`${prefix}Writing ${accent(filename!)}${writeBar}`);
@@ -350,9 +357,15 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
             const outDir = opts.output ?? ".";
             await mkdir(resolve(outDir), { recursive: true });
             const imgName = result.metadata.filename;
-            const outName = result.metadata.basename + ".md";
             const imgPath = resolve(outDir, imgName);
-            const outPath = resolve(outDir, outName);
+            const outPath = opts.name
+              ? formatOutputPath(imgPath, opts.name as string, {
+                  date: new Date().toISOString().split("T")[0],
+                  type: result.type,
+                  subject: result.subject,
+                })
+              : resolve(outDir, result.metadata.basename + ".md");
+            const outName = outPath.split("/").pop() ?? result.metadata.basename + ".md";
 
             // Save the downloaded image
             if (fetchedBuffer) {
@@ -505,6 +518,7 @@ program
   .option("-n, --note <note>", "Focus directive")
   .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
   .option("-o, --output <dir>", "Output directory for .md files")
+  .option("--name <pattern>", "Output filename pattern: {filename}, {date}, {type}, {subject}")
   .option("--no-frontmatter", "Strip YAML frontmatter from output")
   .option("--no-cache", "Skip cache, force re-processing")
   .option("-v, --verbose", "Show detailed processing info")
@@ -551,6 +565,7 @@ program
       note: opts.note as string | undefined,
       template: opts.template as string | undefined,
       output: opts.output as string | undefined,
+      namePattern: opts.name as string | undefined,
       noFrontmatter: opts.frontmatter === false,
       noCache: opts.cache === false,
       verbose: opts.verbose === true,

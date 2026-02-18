@@ -35,6 +35,7 @@
 - [x] `--dry-run` — list files with cached/new status + cost estimate
 - [x] `--no-cache` — skip cache, force re-processing
 - [x] `--no-frontmatter` — strip YAML frontmatter from output
+- [x] `--name <pattern>` — custom output filename patterns (`{filename}`, `{date}`, `{type}`, `{subject}`)
 - [x] `--concurrency <n>` — max concurrent API calls
 - [x] Smart spaces-in-filename handling (unquoted args joined automatically)
 - [x] Friendly onboarding when API key is missing
@@ -105,7 +106,7 @@
 
 1. ~~**MCP: auto-resolve API key**~~ ✅
 2. ~~**`--no-frontmatter` flag**~~ ✅
-3. **Custom filename patterns** — `--name "{date}-{filename}"`
+3. ~~**Custom filename patterns**~~ ✅
 4. **Comparison mode** — `m2md compare a.png b.png`
 5. **Clipboard support** — `m2md --clipboard` grab screenshot from clipboard
 6. **PDF support** — extract pages, describe content

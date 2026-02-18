@@ -8,7 +8,7 @@ export { loadTemplate } from "./templates/loader.js";
 export { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
 export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/builtins.js";
 export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
-export { sidecarPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
+export { sidecarPath, formatOutputPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
 export { buildCacheKey, getCached, setCached, clearCache, getCacheStats, type CacheEntry, type CacheStats } from "./cache/store.js";
 export { loadConfig, mergeOptions, resolveTier, TIER_MAP, type M2mdConfig } from "./config.js";
 export { startWatch, type WatchOptions } from "./watch.js";

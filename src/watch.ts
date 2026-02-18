@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import pc from "picocolors";
 import { discoverImages } from "./batch.js";
 import { processFile } from "./processor.js";
-import { sidecarPath, writeMarkdown } from "./output/writer.js";
+import { sidecarPath, formatOutputPath, writeMarkdown } from "./output/writer.js";
 import { loadTemplate } from "./templates/loader.js";
 import { stripFrontmatter } from "./templates/engine.js";
 import { isSupportedFormat } from "./extractors/metadata.js";
@@ -21,6 +21,7 @@ export interface WatchOptions {
   note?: string;
   template?: string;
   output?: string;
+  namePattern?: string;
   noFrontmatter?: boolean;
   noCache?: boolean;
   verbose?: boolean;
@@ -165,7 +166,13 @@ export async function startWatch(
         providerName: opts.providerName,
       });
 
-      const outPath = sidecarPath(filePath, opts.output);
+      const outPath = opts.namePattern
+        ? formatOutputPath(filePath, opts.namePattern, {
+            date: new Date().toISOString().split("T")[0],
+            type: result.type,
+            subject: result.subject,
+          }, opts.output)
+        : sidecarPath(filePath, opts.output);
       const md = opts.noFrontmatter ? stripFrontmatter(result.markdown) : result.markdown;
       await writeMarkdown(md, outPath);
 
