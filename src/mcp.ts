@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -6,6 +7,53 @@ import { loadTemplate } from "./templates/loader.js";
 import { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 import { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
 import type { Provider } from "./providers/types.js";
+
+/**
+ * Resolve API keys that aren't in the environment.
+ * GUI apps like Claude Desktop don't inherit shell env vars,
+ * so we spawn a login shell to extract them.
+ */
+function resolveEnvKeys(): void {
+  const keys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
+  const missing = keys.filter((k) => !process.env[k]);
+  if (missing.length === 0) return;
+
+  try {
+    // Source common shell profile files to find API keys.
+    // Can't use -i (interactive) as it outputs prompts that corrupt MCP stdio.
+    const home = process.env.HOME ?? "";
+    const rcFiles = [
+      `${home}/.zshrc`,
+      `${home}/.bashrc`,
+      `${home}/.zprofile`,
+      `${home}/.bash_profile`,
+      `${home}/.profile`,
+    ];
+    const sources = rcFiles
+      .map((f) => `[ -f "${f}" ] && . "${f}" 2>/dev/null`)
+      .join("; ");
+    const prints = missing.map((k) => `echo "${k}=$\{${k}:-}"`).join("; ");
+    const output = execSync(`/bin/sh -c '${sources}; ${prints}'`, {
+      encoding: "utf-8",
+      timeout: 3000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+
+    for (const line of output.split("\n")) {
+      const eq = line.indexOf("=");
+      if (eq === -1) continue;
+      const key = line.slice(0, eq);
+      const value = line.slice(eq + 1);
+      if (value && missing.includes(key)) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // Silent — keys may just not be configured
+  }
+}
+
+resolveEnvKeys();
 
 const server = new McpServer({
   name: "m2md",
@@ -29,6 +77,13 @@ server.tool(
       const name = providerName ?? "anthropic";
       const defaultModel = name === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
       const resolvedModel = model ?? defaultModel;
+
+      const apiKeyEnv = name === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
+      if (!process.env[apiKeyEnv]) {
+        throw new Error(
+          `${apiKeyEnv} is not set. Add it to your shell profile or pass it via the MCP server env config.`
+        );
+      }
 
       const providerInstance: Provider = name === "openai"
         ? new OpenAIProvider()

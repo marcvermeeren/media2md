@@ -100,28 +100,29 @@
 
 ## Not Yet Implemented
 
-### Providers
-- [ ] Ollama / local models (`--provider ollama --model llava`)
+### Roadmap (in order)
 
-### Output Quality
-- [ ] Refine system prompts for optimal machine-readable output
-- [ ] Persona prompt tuning (sharper, more consistent output per role)
+1. **MCP: auto-resolve API key** — detect key from shell env so users don't need to paste in config
+2. **`--no-frontmatter` flag** — strip YAML frontmatter from output
+3. **Custom filename patterns** — `--name "{date}-{filename}"`
+4. **Comparison mode** — `m2md compare a.png b.png`
+5. **Clipboard support** — `m2md --clipboard` grab screenshot from clipboard
+6. **PDF support** — extract pages, describe content
+7. **SVG / HEIC / TIFF support** — rasterize/convert then process
+8. **Audio support** — transcript + summary
+9. **Video support** — keyframes + transcript
+10. **Distribution** — npm publish, Homebrew formula, bun compile binary
 
-### Features
-- [ ] `--no-frontmatter` flag
-- [ ] Custom filename patterns (`--name "{date}-{filename}"`)
-- [ ] Batch API (async 50% cheaper processing)
-- [ ] Smart two-pass mode (cheap model first, quality for uncertain)
-- [ ] Comparison mode (`m2md compare a.png b.png`)
+### Backlog (unscheduled)
 
-### Media Types
-- [ ] PDF support
-- [ ] Video (keyframes + transcript)
-- [ ] Audio (transcript + summary)
-- [ ] SVG (rasterize first)
-- [ ] HEIC / TIFF support
-
-### Distribution
-- [ ] npm publish
-- [ ] Homebrew formula
-- [ ] Binary via bun compile
+- Ollama / local models (`--provider ollama --model llava`)
+- Refine system prompts for optimal machine-readable output
+- Persona prompt tuning (sharper, more consistent output per role)
+- Batch API (async 50% cheaper processing)
+- Smart two-pass mode (cheap model first, quality for uncertain)
+- Pipe input (`cat image.png | m2md --stdin`)
+- Diff mode — re-process only where `.md` is older than the image
+- Gallery page (`m2md gallery ./assets/` — index markdown with all images + summaries)
+- Git hook — auto-process images on commit
+- Obsidian template — `[[wikilinks]]`, `#tags`, Dataview-compatible frontmatter
+- Obsidian vault watch mode recipe
