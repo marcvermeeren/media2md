@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { processFile } from "./processor.js";
 import { loadTemplate } from "./templates/loader.js";
+import { stripFrontmatter } from "./templates/engine.js";
 import { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 import { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
 import type { Provider } from "./providers/types.js";
@@ -71,8 +72,9 @@ server.tool(
     prompt: z.string().optional().describe("Custom prompt (overrides persona)"),
     note: z.string().optional().describe("Focus directive — additional aspects to note"),
     template: z.string().optional().describe("Template: default, minimal, alt-text, detailed"),
+    noFrontmatter: z.boolean().optional().describe("Strip YAML frontmatter from output"),
   },
-  async ({ filePath, provider: providerName, model, persona, prompt, note, template: templateName }) => {
+  async ({ filePath, provider: providerName, model, persona, prompt, note, template: templateName, noFrontmatter }) => {
     try {
       const name = providerName ?? "anthropic";
       const defaultModel = name === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
@@ -102,8 +104,9 @@ server.tool(
         providerName: name,
       });
 
+      const md = noFrontmatter ? stripFrontmatter(result.markdown) : result.markdown;
       return {
-        content: [{ type: "text" as const, text: result.markdown }],
+        content: [{ type: "text" as const, text: md }],
       };
     } catch (err) {
       return {

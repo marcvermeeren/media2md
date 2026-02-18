@@ -20,3 +20,10 @@ export function renderTemplate(
 
   return result.trim() + "\n";
 }
+
+/**
+ * Strip YAML frontmatter (leading `---\n...\n---\n` block) from markdown.
+ */
+export function stripFrontmatter(markdown: string): string {
+  return markdown.replace(/^---\n[\s\S]*?\n---\n+/, "");
+}

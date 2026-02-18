@@ -34,6 +34,7 @@
 - [x] `--estimate` — cost preview without API calls (works without API key)
 - [x] `--dry-run` — list files with cached/new status + cost estimate
 - [x] `--no-cache` — skip cache, force re-processing
+- [x] `--no-frontmatter` — strip YAML frontmatter from output
 - [x] `--concurrency <n>` — max concurrent API calls
 - [x] Smart spaces-in-filename handling (unquoted args joined automatically)
 - [x] Friendly onboarding when API key is missing
@@ -102,8 +103,8 @@
 
 ### Roadmap (in order)
 
-1. **MCP: auto-resolve API key** — detect key from shell env so users don't need to paste in config
-2. **`--no-frontmatter` flag** — strip YAML frontmatter from output
+1. ~~**MCP: auto-resolve API key**~~ ✅
+2. ~~**`--no-frontmatter` flag**~~ ✅
 3. **Custom filename patterns** — `--name "{date}-{filename}"`
 4. **Comparison mode** — `m2md compare a.png b.png`
 5. **Clipboard support** — `m2md --clipboard` grab screenshot from clipboard

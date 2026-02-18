@@ -164,6 +164,7 @@ m2md screenshot.png --template minimal     # description + source link
 m2md screenshot.png --template alt-text    # just a description string
 m2md screenshot.png --template detailed    # full metadata table + image embed
 m2md screenshot.png --template ./my.md     # custom template file
+m2md screenshot.png --no-frontmatter       # strip YAML frontmatter from output
 ```
 
 Template variables available in custom templates:
@@ -216,6 +217,7 @@ Both work without an API key so you can preview before committing.
 ```bash
 m2md screenshot.png -m claude-sonnet-4-5-20250929   # specific model
 m2md ./assets/ --concurrency 10                      # parallel API calls (default: 5)
+m2md screenshot.png --no-frontmatter                   # strip YAML frontmatter
 m2md screenshot.png -v                               # verbose output (tokens, cost, timing)
 ```
 

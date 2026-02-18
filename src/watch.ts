@@ -5,6 +5,7 @@ import { discoverImages } from "./batch.js";
 import { processFile } from "./processor.js";
 import { sidecarPath, writeMarkdown } from "./output/writer.js";
 import { loadTemplate } from "./templates/loader.js";
+import { stripFrontmatter } from "./templates/engine.js";
 import { isSupportedFormat } from "./extractors/metadata.js";
 import type { Provider } from "./providers/types.js";
 import * as logger from "./utils/logger.js";
@@ -20,6 +21,7 @@ export interface WatchOptions {
   note?: string;
   template?: string;
   output?: string;
+  noFrontmatter?: boolean;
   noCache?: boolean;
   verbose?: boolean;
 }
@@ -164,7 +166,8 @@ export async function startWatch(
       });
 
       const outPath = sidecarPath(filePath, opts.output);
-      await writeMarkdown(result.markdown, outPath);
+      const md = opts.noFrontmatter ? stripFrontmatter(result.markdown) : result.markdown;
+      await writeMarkdown(md, outPath);
 
       const modelLabel = result.model ? formatModel(result.model) : "";
       const cachedLabel = result.cached ? pc.dim(" (cached)") : "";

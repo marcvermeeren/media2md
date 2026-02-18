@@ -9,6 +9,7 @@ import { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
 import type { Provider } from "./providers/types.js";
 import { getSupportedFormats } from "./extractors/metadata.js";
 import { loadTemplate } from "./templates/loader.js";
+import { stripFrontmatter } from "./templates/engine.js";
 import { getPersonaNames } from "./personas/builtins.js";
 import { discoverImages, runBatch, type BatchResult } from "./batch.js";
 import { sidecarPath, writeMarkdown } from "./output/writer.js";
@@ -41,6 +42,7 @@ program
   .option("-o, --output <dir>", "Output directory for .md files (default: next to image)")
   .option("-r, --recursive", "Recursively scan directories")
   .option("--stdout", "Output to stdout instead of writing files")
+  .option("--no-frontmatter", "Strip YAML frontmatter from output")
   .option("--no-cache", "Skip cache, force re-processing")
   .option("--estimate", "Show estimated cost without processing")
   .option("--dry-run", "Show what would be processed without calling API")
@@ -230,6 +232,8 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
     const provider: Provider = providerName === "openai" ? new OpenAIProvider() : new AnthropicProvider();
     const concurrency = parseInt(opts.concurrency, 10) || 5;
     const toStdout = opts.stdout === true;
+    const noFrontmatter = opts.frontmatter === false;
+    const applyFrontmatter = (md: string) => noFrontmatter ? stripFrontmatter(md) : md;
 
     // Build unified work items: local files + URLs
     type WorkItem = { kind: "file"; path: string } | { kind: "url"; url: string };
@@ -275,7 +279,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
           logger.succeedSpinner(result.cached ? `${prefix}${label} ${pc.dim("(cached)")}` : `${prefix}${label}`);
           results.push({ file: label, success: true });
 
-          process.stdout.write(result.markdown);
+          process.stdout.write(applyFrontmatter(result.markdown));
           if (workItems.length > 1) {
             process.stdout.write("\n---\n\n");
           }
@@ -334,7 +338,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
               const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
               logger.updateSpinner(`${prefix}Writing ${accent(filename!)}${writeBar}`);
             }
-            await writeMarkdown(result.markdown, outPath);
+            await writeMarkdown(applyFrontmatter(result.markdown), outPath);
             results.push({ file: item.path, success: true, outputPath: outPath, cached: result.cached });
             logger.succeedSpinner(
               result.cached
@@ -359,7 +363,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
               const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
               logger.updateSpinner(`${prefix}Writing ${accent(outName)}${writeBar}`);
             }
-            await writeMarkdown(result.markdown, outPath);
+            await writeMarkdown(applyFrontmatter(result.markdown), outPath);
             results.push({ file: item.url, success: true, outputPath: outPath, cached: result.cached });
             logger.succeedSpinner(
               result.cached
@@ -501,6 +505,7 @@ program
   .option("-n, --note <note>", "Focus directive")
   .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
   .option("-o, --output <dir>", "Output directory for .md files")
+  .option("--no-frontmatter", "Strip YAML frontmatter from output")
   .option("--no-cache", "Skip cache, force re-processing")
   .option("-v, --verbose", "Show detailed processing info")
   .action(async (dir: string, cliOpts) => {
@@ -546,6 +551,7 @@ program
       note: opts.note as string | undefined,
       template: opts.template as string | undefined,
       output: opts.output as string | undefined,
+      noFrontmatter: opts.frontmatter === false,
       noCache: opts.cache === false,
       verbose: opts.verbose === true,
     });

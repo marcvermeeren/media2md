@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { writeFile, rm, mkdir } from "node:fs/promises";
-import { renderTemplate } from "../src/templates/engine.js";
+import { renderTemplate, stripFrontmatter } from "../src/templates/engine.js";
 import {
   DEFAULT_TEMPLATE,
   MINIMAL_TEMPLATE,
@@ -108,6 +108,33 @@ describe("built-in templates", () => {
       "alt-text",
       "detailed",
     ]);
+  });
+});
+
+describe("stripFrontmatter", () => {
+  it("removes YAML frontmatter from markdown", () => {
+    const input = "---\ntype: screenshot\nsubject: test\n---\n\n# Hello\n\nWorld\n";
+    expect(stripFrontmatter(input)).toBe("# Hello\n\nWorld\n");
+  });
+
+  it("returns markdown unchanged when no frontmatter", () => {
+    const input = "# Hello\n\nWorld\n";
+    expect(stripFrontmatter(input)).toBe("# Hello\n\nWorld\n");
+  });
+
+  it("only strips leading frontmatter, not mid-document ---", () => {
+    const input = "---\ntype: test\n---\n\nContent\n\n---\n\nMore content\n";
+    const result = stripFrontmatter(input);
+    expect(result).toBe("Content\n\n---\n\nMore content\n");
+  });
+
+  it("works with default template output", () => {
+    const rendered = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
+    const stripped = stripFrontmatter(rendered);
+    expect(stripped).not.toContain("type: screenshot");
+    expect(stripped).not.toMatch(/^---/);
+    expect(stripped).toContain("Dashboard with analytics charts");
+    expect(stripped).toContain("## Layout");
   });
 });
 

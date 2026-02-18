@@ -2,7 +2,7 @@ export { processFile, processBuffer, type ProcessOptions, type ProcessResult, ty
 export { extractMetadata, extractMetadataFromBuffer, isSupportedFormat, getSupportedFormats, mimeTypeFromExtension, type ImageMetadata, type ExtractResult } from "./extractors/metadata.js";
 export { isUrl, looksLikeImageUrl, filenameFromUrl, fetchImage, screenshotPage, ContentTypeError } from "./url.js";
 export { parseResponse, type ParsedResponse } from "./parser.js";
-export { renderTemplate } from "./templates/engine.js";
+export { renderTemplate, stripFrontmatter } from "./templates/engine.js";
 export { DEFAULT_TEMPLATE, MINIMAL_TEMPLATE, ALT_TEXT_TEMPLATE, DETAILED_TEMPLATE, BUILTIN_TEMPLATES } from "./templates/builtins.js";
 export { loadTemplate } from "./templates/loader.js";
 export { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
