@@ -4,6 +4,7 @@ export interface M2mdConfig {
   model?: string;
   persona?: string;
   prompt?: string;
+  note?: string;
   template?: string;
   output?: string;
   recursive?: boolean;

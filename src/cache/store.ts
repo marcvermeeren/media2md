@@ -5,9 +5,13 @@ import { createHash } from "node:crypto";
 
 export interface CacheEntry {
   hash: string;
+  type: string;
+  subject: string;
   markdown: string;
   description: string;
-  extractedText: string[];
+  extractedText: string;
+  colors?: string;
+  tags?: string;
   model: string;
   persona: string;
   cachedAt: string;
@@ -36,7 +40,7 @@ function entryPath(key: string): string {
  */
 export function buildCacheKey(
   contentHash: string,
-  opts: { model?: string; persona?: string; prompt?: string; templateName?: string }
+  opts: { model?: string; persona?: string; prompt?: string; templateName?: string; note?: string }
 ): string {
   const parts = [
     contentHash,
@@ -44,6 +48,7 @@ export function buildCacheKey(
     opts.persona ?? "",
     opts.prompt ?? "",
     opts.templateName ?? "",
+    opts.note ?? "",
   ];
   return createHash("sha256").update(parts.join("|")).digest("hex");
 }

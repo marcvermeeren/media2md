@@ -1,17 +1,17 @@
 export const DEFAULT_TEMPLATE = `---
+type: {{type}}
+subject: "{{subject}}"
+colors: [{{colors}}]
+tags: [{{tags}}]
 source: {{filename}}
-format: {{format}}
 dimensions: {{dimensions}}
-size: {{sizeHuman}}
-sha256: {{sha256}}
 processed: {{processedDate}}
 model: {{model}}
 {{#if persona}}persona: {{persona}}
+{{/if}}{{#if note}}note: "{{note}}"
 {{/if}}---
 
-# {{basename}}
-
-## Description
+{{subject}}
 
 {{description}}
 
@@ -20,10 +20,6 @@ model: {{model}}
 
 {{extractedText}}
 {{/if}}
-
-## Source
-
-![{{basename}}]({{sourcePath}})
 `;
 
 export const MINIMAL_TEMPLATE = `{{description}}
@@ -35,6 +31,10 @@ export const ALT_TEXT_TEMPLATE = `{{description}}
 `;
 
 export const DETAILED_TEMPLATE = `---
+type: {{type}}
+subject: "{{subject}}"
+colors: [{{colors}}]
+tags: [{{tags}}]
 source: {{filename}}
 format: {{format}}
 dimensions: {{dimensions}}
@@ -46,11 +46,12 @@ sha256: {{sha256}}
 processed: {{processedDate}}
 model: {{model}}
 {{#if persona}}persona: {{persona}}
+{{/if}}{{#if note}}note: "{{note}}"
 {{/if}}---
 
 # {{basename}}
 
-## Description
+{{subject}}
 
 {{description}}
 

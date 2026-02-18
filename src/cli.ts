@@ -12,7 +12,7 @@ import { discoverImages, runBatch, type BatchResult } from "./batch.js";
 import { sidecarPath, writeMarkdown } from "./output/writer.js";
 import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/store.js";
 import { extractMetadata } from "./extractors/metadata.js";
-import { estimateCost, formatCost } from "./cost.js";
+import { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel } from "./cost.js";
 import * as logger from "./utils/logger.js";
 import { brand, accent } from "./utils/logger.js";
 
@@ -31,6 +31,7 @@ program
   .option("-m, --model <model>", "AI model to use", DEFAULT_ANTHROPIC_MODEL)
   .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
   .option("--prompt <prompt>", "Custom prompt (overrides persona)")
+  .option("-n, --note <note>", "Focus directive — additional aspects for the LLM to note")
   .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
   .option("-o, --output <dir>", "Output directory for .md files (default: next to image)")
   .option("-r, --recursive", "Recursively scan directories")
@@ -94,6 +95,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
           persona: opts.persona,
           prompt: opts.prompt,
           templateName: opts.template,
+          note: opts.note,
         });
         const cached = opts.cache !== false ? (await getCached(key)) !== null : false;
         items.push({ metadata, cached, path: filePath });
@@ -101,11 +103,42 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
 
       if (opts.dryRun) {
         logger.header("Dry run");
-        for (const item of items) {
-          const status = item.cached ? pc.dim("cached") : pc.green("new");
+
+        const newCount = items.filter((item) => !item.cached).length;
+        let totalEstTokens = 0;
+
+        const rows = items.map((item) => {
           const name = item.path.split("/").pop() ?? item.path;
-          process.stderr.write(`  ${accent(name)} ${pc.dim("·")} ${status} ${pc.dim("·")} ${pc.dim(item.metadata.sizeHuman)}\n`);
-        }
+          const status = item.cached ? pc.dim("cached") : pc.green("new");
+          const size = item.metadata.sizeHuman;
+          let estTokens: string;
+          if (item.cached) {
+            estTokens = pc.dim("—");
+          } else {
+            const tokens = estimateImageTokens(item.metadata);
+            totalEstTokens += tokens;
+            estTokens = `~${tokens.toLocaleString()}`;
+          }
+          return [name, status, size, estTokens];
+        });
+
+        const footer = [
+          `${items.length} file${items.length !== 1 ? "s" : ""}`,
+          newCount > 0 ? `${newCount} new` : "",
+          "",
+          totalEstTokens > 0 ? `~${totalEstTokens.toLocaleString()}` : "",
+        ];
+
+        logger.table(
+          [
+            { header: "File" },
+            { header: "Status" },
+            { header: "Size", align: "right" },
+            { header: "Est. tokens", align: "right" },
+          ],
+          rows,
+          footer,
+        );
       }
 
       const estimate = estimateCost(items, opts.model);
@@ -154,23 +187,28 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       // Stdout mode
       const results: BatchResult[] = [];
 
+      const stdoutTotal = imagePaths.length;
       logger.blank();
-      for (const filePath of imagePaths) {
+      for (let i = 0; i < imagePaths.length; i++) {
+        const filePath = imagePaths[i];
         const filename = filePath.split("/").pop() ?? filePath;
+        const prefix = stdoutTotal > 1 ? `${pc.dim(`[${i + 1}/${stdoutTotal}]`)} ` : "";
+        const barLine = stdoutTotal > 1 ? `\n\n  ${logger.progressBar(i, stdoutTotal)} ${pc.dim(`${i}/${stdoutTotal}`)}` : "";
         try {
-          logger.startSpinner(`Analyzing ${accent(filename)}`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(filename)}${barLine}`);
 
           const result = await processFile(filePath, {
             model: opts.model,
             persona: opts.persona,
             prompt: opts.prompt,
+            note: opts.note,
             template,
             templateName: opts.template,
             noCache: opts.cache === false,
             provider,
           });
 
-          logger.succeedSpinner(result.cached ? `${filename} ${pc.dim("(cached)")}` : filename);
+          logger.succeedSpinner(result.cached ? `${prefix}${filename} ${pc.dim("(cached)")}` : `${prefix}${filename}`);
           results.push({ file: filePath, success: true });
 
           process.stdout.write(result.markdown);
@@ -192,6 +230,9 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       // Sidecar mode (default) — sequential for clean spinner output
       const total = imagePaths.length;
       const results: (BatchResult & { cached?: boolean })[] = [];
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let resolvedModel: string | undefined;
       const startTime = Date.now();
 
       logger.blank();
@@ -199,24 +240,35 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
         const filePath = imagePaths[i];
         const filename = filePath.split("/").pop() ?? filePath;
         const prefix = total > 1 ? `${pc.dim(`[${i + 1}/${total}]`)} ` : "";
+        const barLine = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
 
         try {
-          logger.startSpinner(`${prefix}Analyzing ${accent(filename)}`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(filename)}${barLine}`);
 
           const result = await processFile(filePath, {
             model: opts.model,
             persona: opts.persona,
             prompt: opts.prompt,
+            note: opts.note,
             template,
             templateName: opts.template,
             noCache: opts.cache === false,
             provider,
           });
 
+          if (result.usage) {
+            totalInputTokens += result.usage.inputTokens;
+            totalOutputTokens += result.usage.outputTokens;
+          }
+          if (result.model) {
+            resolvedModel = result.model;
+          }
+
           const outPath = sidecarPath(filePath, opts.output);
 
           if (!result.cached) {
-            logger.updateSpinner(`${prefix}Writing ${accent(filename)}`);
+            const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
+            logger.updateSpinner(`${prefix}Writing ${accent(filename)}${writeBar}`);
           }
           await writeMarkdown(result.markdown, outPath);
 
@@ -229,7 +281,9 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
 
           if (opts.verbose) {
             logger.info(`Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height} | ${result.metadata.sizeHuman}`);
-            logger.info(`Extracted ${result.extractedText.length} text segments`);
+            if (result.usage) {
+              logger.info(`Tokens: ${result.usage.inputTokens.toLocaleString()} in + ${result.usage.outputTokens.toLocaleString()} out`);
+            }
           }
         } catch (err) {
           logger.stopSpinner();
@@ -249,6 +303,15 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       if (failed === 0) {
         const parts = [`${brand(succeeded.toString())} file${succeeded > 1 ? "s" : ""} processed`];
         if (cachedCount > 0) parts.push(`${pc.dim(`${cachedCount} from cache`)}`);
+        const modelLabel = resolvedModel ? formatModel(resolvedModel) : formatModel(opts.model);
+        parts.push(pc.dim(modelLabel));
+        if (opts.verbose && totalInputTokens > 0) {
+          const totalTokens = totalInputTokens + totalOutputTokens;
+          const tokenStr = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}K` : totalTokens.toString();
+          parts.push(pc.dim(`${tokenStr} tokens`));
+          const cost = calculateCost(totalInputTokens, totalOutputTokens, resolvedModel ?? opts.model);
+          parts.push(pc.dim(`$${cost.toFixed(2)}`));
+        }
         parts.push(pc.dim(`${elapsed}s`));
         logger.success(parts.join(pc.dim(" · ")));
       } else {
