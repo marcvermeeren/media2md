@@ -40,7 +40,7 @@ function entryPath(key: string): string {
  */
 export function buildCacheKey(
   contentHash: string,
-  opts: { model?: string; persona?: string; prompt?: string; templateName?: string; note?: string }
+  opts: { model?: string; persona?: string; prompt?: string; templateName?: string; note?: string; provider?: string }
 ): string {
   const parts = [
     contentHash,
@@ -49,6 +49,7 @@ export function buildCacheKey(
     opts.prompt ?? "",
     opts.templateName ?? "",
     opts.note ?? "",
+    opts.provider ?? "",
   ];
   return createHash("sha256").update(parts.join("|")).digest("hex");
 }

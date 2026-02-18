@@ -1,7 +1,9 @@
 import { cosmiconfig } from "cosmiconfig";
 
 export interface M2mdConfig {
+  provider?: string;
   model?: string;
+  tier?: string;
   persona?: string;
   prompt?: string;
   note?: string;
@@ -10,6 +12,33 @@ export interface M2mdConfig {
   recursive?: boolean;
   cache?: boolean;
   concurrency?: number;
+}
+
+export const TIER_MAP: Record<string, { provider: string; model: string }> = {
+  fast: { provider: "openai", model: "gpt-4o-mini" },
+  quality: { provider: "anthropic", model: "claude-sonnet-4-5-20250929" },
+};
+
+/**
+ * Resolve tier into provider/model, only when they aren't explicitly set.
+ * Precedence: explicit --provider/--model > --tier > config > defaults
+ */
+export function resolveTier(
+  opts: Record<string, unknown>,
+  config: M2mdConfig
+): void {
+  const tier = (opts.tier as string | undefined) ?? config.tier;
+  if (!tier) return;
+
+  const mapping = TIER_MAP[tier];
+  if (!mapping) return;
+
+  if (opts.provider === undefined) {
+    opts.provider = mapping.provider;
+  }
+  if (opts.model === undefined) {
+    opts.model = mapping.model;
+  }
 }
 
 const explorer = cosmiconfig("m2md", {

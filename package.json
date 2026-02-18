@@ -4,7 +4,8 @@
   "description": "Convert images to structured markdown with AI-generated descriptions and extracted text",
   "type": "module",
   "bin": {
-    "m2md": "./dist/cli.js"
+    "m2md": "./dist/cli.js",
+    "m2md-mcp": "./dist/mcp.js"
   },
   "exports": {
     ".": {
@@ -38,9 +39,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "commander": "^13.1.0",
     "cosmiconfig": "^9.0.0",
     "image-size": "^2.0.1",
+    "openai": "^6.22.0",
     "ora": "^8.1.1",
     "picocolors": "^1.1.1"
   },

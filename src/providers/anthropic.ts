@@ -44,7 +44,14 @@ export class AnthropicProvider implements Provider {
       throw new Error("No text response from API");
     }
 
-    return { rawText: textBlock.text };
+    return {
+      rawText: textBlock.text,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+      },
+      model: response.model,
+    };
   }
 }
 

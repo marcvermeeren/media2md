@@ -12,6 +12,10 @@ import {
 import { loadTemplate } from "../src/templates/loader.js";
 
 const sampleVars: Record<string, string> = {
+  type: "screenshot",
+  subject: "Dashboard with analytics charts",
+  colors: "dark blue, white, light gray",
+  tags: "dashboard, chart, analytics, navigation, sidebar",
   filename: "test.png",
   basename: "test",
   format: "PNG",
@@ -26,23 +30,34 @@ const sampleVars: Record<string, string> = {
   model: "claude-sonnet-4-5-20250929",
   persona: "brand",
   sourcePath: "./test.png",
-  description: "A test screenshot showing a dashboard.",
-  extractedText: "- Dashboard\n- Settings\n- Logout",
+  description: "## Layout\n- A dashboard with two chart panels\n\n## Content\n- Line chart showing revenue\n- Bar chart showing users",
+  extractedText: "**Navigation:** Dashboard | Settings | Logout\n**Chart Title:** Monthly Revenue",
 };
 
 describe("built-in templates", () => {
-  it("default template includes frontmatter and all sections", () => {
+  it("default template includes type, subject, colors, and tags in frontmatter", () => {
     const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
     expect(result).toContain("---");
+    expect(result).toContain("type: screenshot");
+    expect(result).toContain('subject: "Dashboard with analytics charts"');
+    expect(result).toContain("colors: [dark blue, white, light gray]");
+    expect(result).toContain("tags: [dashboard, chart, analytics, navigation, sidebar]");
     expect(result).toContain("source: test.png");
-    expect(result).toContain("format: PNG");
-    expect(result).toContain("# test");
-    expect(result).toContain("## Description");
+    expect(result).toContain("Dashboard with analytics charts");
+    expect(result).toContain("## Layout");
     expect(result).toContain("## Extracted Text");
-    expect(result).toContain("- Dashboard");
-    expect(result).toContain("## Source");
-    expect(result).toContain("![test](./test.png)");
+    expect(result).toContain("**Navigation:**");
     expect(result).toContain("persona: brand");
+  });
+
+  it("default template does not include sha256, format, size, or # heading", () => {
+    const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
+    expect(result).not.toContain("sha256:");
+    expect(result).not.toContain("format: PNG");
+    expect(result).not.toContain("size:");
+    expect(result).not.toContain("# test");
+    expect(result).not.toContain("## Source");
+    expect(result).not.toContain("![test]");
   });
 
   it("default template omits extracted text when empty", () => {
@@ -59,23 +74,31 @@ describe("built-in templates", () => {
 
   it("minimal template is just description + source link", () => {
     const result = renderTemplate(MINIMAL_TEMPLATE, sampleVars);
-    expect(result).toContain("A test screenshot showing a dashboard.");
+    expect(result).toContain("## Layout");
     expect(result).toContain("Source: [test.png](./test.png)");
     expect(result).not.toContain("---");
-    expect(result).not.toContain("## Description");
   });
 
   it("alt-text template is just description", () => {
     const result = renderTemplate(ALT_TEXT_TEMPLATE, sampleVars);
-    expect(result.trim()).toBe("A test screenshot showing a dashboard.");
+    expect(result).toContain("## Layout");
+    expect(result).not.toContain("---");
+    expect(result).not.toContain("Source:");
   });
 
-  it("detailed template includes metadata table", () => {
+  it("detailed template includes metadata table, sha256, colors, and tags", () => {
     const result = renderTemplate(DETAILED_TEMPLATE, sampleVars);
     expect(result).toContain("| Property | Value |");
     expect(result).toContain("| File | test.png |");
     expect(result).toContain("| Dimensions | 800x600 |");
     expect(result).toContain("sizeBytes: 43110");
+    expect(result).toContain("sha256: abc123def456");
+    expect(result).toContain("type: screenshot");
+    expect(result).toContain('subject: "Dashboard with analytics charts"');
+    expect(result).toContain("colors: [dark blue, white, light gray]");
+    expect(result).toContain("tags: [dashboard, chart, analytics, navigation, sidebar]");
+    expect(result).toContain("# test");
+    expect(result).toContain("![test](./test.png)");
   });
 
   it("BUILTIN_TEMPLATES map has all templates", () => {

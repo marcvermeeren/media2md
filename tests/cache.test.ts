@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { join } from "node:path";
-import { rm, readdir } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import {
   buildCacheKey,
   getCached,
@@ -20,9 +20,13 @@ beforeEach(async () => {
 
 const sampleEntry: CacheEntry = {
   hash: "abc123",
+  type: "screenshot",
+  subject: "A test dashboard",
   markdown: "# Test\n\nSome markdown\n",
   description: "A test image",
-  extractedText: ["Hello", "World"],
+  extractedText: "**Heading:** Hello World",
+  colors: "blue, white, gray",
+  tags: "dashboard, chart, heading",
   model: "claude-sonnet-4-5-20250929",
   persona: "",
   cachedAt: "2026-02-17T12:00:00.000Z",
@@ -78,9 +82,11 @@ describe("getCached / setCached", () => {
     const result = await getCached(key);
     expect(result).not.toBeNull();
     expect(result!.hash).toBe("abc123");
+    expect(result!.type).toBe("screenshot");
+    expect(result!.subject).toBe("A test dashboard");
     expect(result!.markdown).toBe("# Test\n\nSome markdown\n");
     expect(result!.description).toBe("A test image");
-    expect(result!.extractedText).toEqual(["Hello", "World"]);
+    expect(result!.extractedText).toBe("**Heading:** Hello World");
   });
 
   it("overwrites existing entry", async () => {

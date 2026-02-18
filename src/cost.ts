@@ -1,10 +1,12 @@
 import type { ImageMetadata } from "./extractors/metadata.js";
 
-// Anthropic pricing per million tokens (as of 2025)
+// Pricing per million tokens (as of 2025)
 const PRICING: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-5-20250929": { input: 3.0, output: 15.0 },
   "claude-opus-4-6": { input: 15.0, output: 75.0 },
   "claude-haiku-4-5-20251001": { input: 0.8, output: 4.0 },
+  "gpt-4o": { input: 2.5, output: 10.0 },
+  "gpt-4o-mini": { input: 0.15, output: 0.60 },
 };
 
 const DEFAULT_PRICING = { input: 3.0, output: 15.0 };
@@ -67,6 +69,26 @@ export function estimateCost(
   };
 }
 
+/**
+ * Calculate actual cost from real token usage.
+ */
+export function calculateCost(inputTokens: number, outputTokens: number, model: string): number {
+  const pricing = PRICING[model] ?? DEFAULT_PRICING;
+  return (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
+}
+
+/**
+ * Shorten a full model ID for display:
+ * "claude-sonnet-4-5-20250929" → "sonnet-4-5"
+ * "gpt-4o-mini" → "gpt-4o-mini"
+ */
+export function formatModel(model: string): string {
+  if (model.startsWith("claude-")) {
+    return model.replace("claude-", "").split("-2")[0];
+  }
+  return model;
+}
+
 export function formatCost(estimate: CostEstimate): string {
   const cost = estimate.estimatedCost;
   const costStr = cost < 0.01
@@ -78,7 +100,7 @@ export function formatCost(estimate: CostEstimate): string {
     ? ` (${estimate.cached} cached, ${estimate.toProcess} new)`
     : "";
 
-  const modelShort = estimate.model.replace("claude-", "").split("-2")[0];
+  const modelShort = formatModel(estimate.model);
 
   const lines = [
     `  Files     ${filesLabel}${cacheNote}`,

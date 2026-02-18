@@ -43,7 +43,8 @@ export function succeedSpinner(text: string): void {
     spinner.stop();
     spinner = null;
   }
-  process.stderr.write(pc.green(`  ✓ ${text}\n`));
+  // Prefix: 2-space indent + ✓ + space = matches ora indent:2 + spinner char + space
+  process.stderr.write(`  ${pc.green("✓")} ${text}\n`);
 }
 
 export function failSpinner(text: string): void {
@@ -51,7 +52,7 @@ export function failSpinner(text: string): void {
     spinner.stop();
     spinner = null;
   }
-  process.stderr.write(pc.red(`  ✗ ${text}\n`));
+  process.stderr.write(`  ${pc.red("✗")} ${text}\n`);
 }
 
 export function success(msg: string): void {
@@ -90,8 +91,65 @@ export function summary(lines: string[]): void {
 }
 
 // Strip ANSI escape codes for length calculation
-function stripAnsi(str: string): string {
+export function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+export function progressBar(current: number, total: number, width = 20): string {
+  const filled = Math.round((current / total) * width);
+  const empty = width - filled;
+  return `${pc.cyan("█".repeat(filled))}${pc.dim("░".repeat(empty))}`;
+}
+
+interface TableColumn {
+  header: string;
+  align?: "left" | "right";
+}
+
+export function table(columns: TableColumn[], rows: string[][], footer?: string[]): void {
+  const gap = "   ";
+  const indent = "  ";
+
+  // Calculate column widths from headers and all row/footer values
+  const widths = columns.map((col, i) => {
+    let max = stripAnsi(col.header).length;
+    for (const row of rows) {
+      if (row[i] !== undefined) {
+        max = Math.max(max, stripAnsi(row[i]).length);
+      }
+    }
+    if (footer && footer[i] !== undefined) {
+      max = Math.max(max, stripAnsi(footer[i]).length);
+    }
+    return max;
+  });
+
+  function padCell(text: string, width: number, align: "left" | "right"): string {
+    const bare = stripAnsi(text).length;
+    const pad = Math.max(0, width - bare);
+    return align === "right" ? " ".repeat(pad) + text : text + " ".repeat(pad);
+  }
+
+  // Header
+  const headerLine = columns.map((col, i) => pc.dim(padCell(col.header, widths[i], col.align ?? "left"))).join(gap);
+  process.stderr.write(`${indent}${headerLine}\n`);
+
+  // Separator
+  const totalWidth = widths.reduce((a, b) => a + b, 0) + gap.length * (widths.length - 1);
+  process.stderr.write(`${indent}${pc.dim("─".repeat(totalWidth))}\n`);
+
+  // Data rows
+  for (const row of rows) {
+    const line = columns.map((col, i) => padCell(row[i] ?? "", widths[i], col.align ?? "left")).join(gap);
+    process.stderr.write(`${indent}${line}\n`);
+  }
+
+  // Footer
+  if (footer) {
+    process.stderr.write(`${indent}${pc.dim("─".repeat(totalWidth))}\n`);
+    const footerLine = columns.map((col, i) => pc.bold(padCell(footer[i] ?? "", widths[i], col.align ?? "left"))).join(gap);
+    process.stderr.write(`${indent}${footerLine}\n`);
+  }
 }
 
 export { brand, accent };

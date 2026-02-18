@@ -2,9 +2,11 @@ import { Command } from "commander";
 import { resolve } from "node:path";
 import { stat } from "node:fs/promises";
 import pc from "picocolors";
-import { loadConfig, mergeOptions } from "./config.js";
-import { processFile } from "./processor.js";
+import { loadConfig, mergeOptions, resolveTier, TIER_MAP } from "./config.js";
+import { processFile, processBuffer } from "./processor.js";
 import { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
+import { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
+import type { Provider } from "./providers/types.js";
 import { getSupportedFormats } from "./extractors/metadata.js";
 import { loadTemplate } from "./templates/loader.js";
 import { getPersonaNames } from "./personas/builtins.js";
@@ -13,6 +15,7 @@ import { sidecarPath, writeMarkdown } from "./output/writer.js";
 import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/store.js";
 import { extractMetadata } from "./extractors/metadata.js";
 import { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel } from "./cost.js";
+import { isUrl, fetchImage, screenshotPage, ContentTypeError } from "./url.js";
 import * as logger from "./utils/logger.js";
 import { brand, accent } from "./utils/logger.js";
 
@@ -28,7 +31,9 @@ program
   })
   .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.1.0")}\n`)
   .argument("<files...>", "Image file(s) or directory to process")
-  .option("-m, --model <model>", "AI model to use", DEFAULT_ANTHROPIC_MODEL)
+  .option("--provider <provider>", "AI provider: anthropic, openai")
+  .option("-m, --model <model>", "AI model to use")
+  .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
   .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
   .option("--prompt <prompt>", "Custom prompt (overrides persona)")
   .option("-n, --note <note>", "Focus directive — additional aspects for the LLM to note")
@@ -53,14 +58,19 @@ ${brand(pc.bold("Examples:"))}
   ${pc.dim("$")} m2md ./assets/ -r -o ./docs/             ${pc.dim("# recursive, output dir")}
   ${pc.dim("$")} m2md photo.jpg --persona brand           ${pc.dim("# brand analyst lens")}
   ${pc.dim("$")} m2md diagram.png --template minimal      ${pc.dim("# minimal output")}
+  ${pc.dim("$")} m2md photo.jpg --provider openai         ${pc.dim("# use OpenAI GPT-4o")}
+  ${pc.dim("$")} m2md photo.jpg --tier fast              ${pc.dim("# quick + cheap (gpt-4o-mini)")}
+  ${pc.dim("$")} m2md photo.jpg --tier quality           ${pc.dim("# best results (claude-sonnet)")}
 
 ${brand(pc.bold("Personas:"))} ${getPersonaNames().map((n) => accent(n)).join(pc.dim(", "))}
 
 ${brand(pc.bold("Templates:"))} ${["default", "minimal", "alt-text", "detailed"].map((n) => accent(n)).join(pc.dim(", "))}${pc.dim(", or path to .md file")}
 
 ${brand(pc.bold("Environment:"))}
-  ${pc.bold("ANTHROPIC_API_KEY")}    Your Anthropic API key ${pc.dim("(required)")}
+  ${pc.bold("ANTHROPIC_API_KEY")}    Your Anthropic API key ${pc.dim("(required for anthropic provider)")}
                        Get one at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}
+  ${pc.bold("OPENAI_API_KEY")}       Your OpenAI API key ${pc.dim("(required for openai provider)")}
+                       Get one at ${brand(pc.underline("https://platform.openai.com/api-keys"))}
 
 ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.dim(f)).join(", ")}
 `
@@ -70,14 +80,44 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
     const config = await loadConfig();
     const opts = mergeOptions(cliOpts, config);
 
+    // Resolve tier into provider/model (only fills undefined values)
+    resolveTier(opts, config);
+
+    // Validate tier if explicitly provided
+    if (opts.tier && !TIER_MAP[opts.tier as string]) {
+      logger.blank();
+      logger.error(`Unknown tier: ${opts.tier}. Supported: ${Object.keys(TIER_MAP).join(", ")}`);
+      logger.blank();
+      process.exit(1);
+    }
+
+    // Resolve provider and default model
+    const providerName = opts.provider ?? "anthropic";
+    if (providerName !== "anthropic" && providerName !== "openai") {
+      logger.blank();
+      logger.error(`Unknown provider: ${providerName}. Supported: anthropic, openai`);
+      logger.blank();
+      process.exit(1);
+    }
+    const defaultModel = providerName === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
+    if (!opts.model) {
+      opts.model = defaultModel;
+    }
+
     // Try joining args as a single path if individual files aren't found
     // Handles unquoted filenames with spaces: m2md Screenshot 2026-02-13 at 17.07.21.png
     const resolvedFiles = await resolveFileArgs(files);
 
-    // Discover files
-    const imagePaths = await discoverImages(resolvedFiles, { recursive: opts.recursive });
+    // Split URLs from file paths
+    const urlInputs = resolvedFiles.filter(isUrl);
+    const fileInputs = resolvedFiles.filter((f) => !isUrl(f));
 
-    if (imagePaths.length === 0) {
+    // Discover local files
+    const imagePaths = fileInputs.length > 0
+      ? await discoverImages(fileInputs, { recursive: opts.recursive })
+      : [];
+
+    if (imagePaths.length === 0 && urlInputs.length === 0) {
       logger.blank();
       logger.warn("No supported images found.");
       logger.blank();
@@ -96,6 +136,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
           prompt: opts.prompt,
           templateName: opts.template,
           note: opts.note,
+          provider: providerName,
         });
         const cached = opts.cache !== false ? (await getCached(key)) !== null : false;
         items.push({ metadata, cached, path: filePath });
@@ -153,19 +194,26 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
     }
 
     // Check for API key (after estimate/dry-run which don't need it)
-    if (!process.env.ANTHROPIC_API_KEY) {
+    const apiKeyEnv = providerName === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
+    if (!process.env[apiKeyEnv]) {
+      const keyUrls: Record<string, string> = {
+        anthropic: "https://console.anthropic.com/settings/keys",
+        openai: "https://platform.openai.com/api-keys",
+      };
+      const examples: Record<string, string> = {
+        anthropic: 'export ANTHROPIC_API_KEY="sk-ant-..."',
+        openai: 'export OPENAI_API_KEY="sk-..."',
+      };
       logger.blank();
       process.stderr.write(`  ${pc.bold(pc.red("No API key found."))}\n`);
       logger.blank();
-      process.stderr.write(`  m2md requires an Anthropic API key to analyze images.\n`);
+      process.stderr.write(`  m2md requires ${brand(apiKeyEnv)} for the ${providerName} provider.\n`);
       logger.blank();
       process.stderr.write(`  ${brand(pc.bold("Quick setup:"))}\n`);
-      process.stderr.write(`  ${pc.dim("1.")} Get a key at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
+      process.stderr.write(`  ${pc.dim("1.")} Get a key at ${brand(pc.underline(keyUrls[providerName]))}\n`);
       process.stderr.write(`  ${pc.dim("2.")} Add to your shell profile:\n`);
       logger.blank();
-      process.stderr.write(`     ${brand('export ANTHROPIC_API_KEY="sk-ant-..."')}\n`);
-      logger.blank();
-      process.stderr.write(`  Or run: ${brand("m2md setup")}\n`);
+      process.stderr.write(`     ${brand(examples[providerName])}\n`);
       logger.blank();
       process.exit(1);
     }
@@ -179,47 +227,63 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       process.exit(1);
     }
 
-    const provider = new AnthropicProvider();
+    const provider: Provider = providerName === "openai" ? new OpenAIProvider() : new AnthropicProvider();
     const concurrency = parseInt(opts.concurrency, 10) || 5;
     const toStdout = opts.stdout === true;
+
+    // Build unified work items: local files + URLs
+    type WorkItem = { kind: "file"; path: string } | { kind: "url"; url: string };
+    const workItems: WorkItem[] = [
+      ...imagePaths.map((p): WorkItem => ({ kind: "file", path: p })),
+      ...urlInputs.map((u): WorkItem => ({ kind: "url", url: u })),
+    ];
+
+    const processOpts = {
+      model: opts.model,
+      persona: opts.persona,
+      prompt: opts.prompt,
+      note: opts.note,
+      template,
+      templateName: opts.template,
+      noCache: opts.cache === false,
+      provider,
+      providerName,
+    };
 
     if (toStdout) {
       // Stdout mode
       const results: BatchResult[] = [];
 
-      const stdoutTotal = imagePaths.length;
+      const stdoutTotal = workItems.length;
       logger.blank();
-      for (let i = 0; i < imagePaths.length; i++) {
-        const filePath = imagePaths[i];
-        const filename = filePath.split("/").pop() ?? filePath;
+      for (let i = 0; i < workItems.length; i++) {
+        const item = workItems[i];
+        const label = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : item.url;
         const prefix = stdoutTotal > 1 ? `${pc.dim(`[${i + 1}/${stdoutTotal}]`)} ` : "";
         const barLine = stdoutTotal > 1 ? `\n\n  ${logger.progressBar(i, stdoutTotal)} ${pc.dim(`${i}/${stdoutTotal}`)}` : "";
         try {
-          logger.startSpinner(`${prefix}Analyzing ${accent(filename)}${barLine}`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${barLine}`);
 
-          const result = await processFile(filePath, {
-            model: opts.model,
-            persona: opts.persona,
-            prompt: opts.prompt,
-            note: opts.note,
-            template,
-            templateName: opts.template,
-            noCache: opts.cache === false,
-            provider,
-          });
+          let result;
+          if (item.kind === "file") {
+            result = await processFile(item.path, processOpts);
+          } else {
+            const fetched = await fetchUrl(item.url);
+            result = await processBuffer(fetched, processOpts);
+          }
 
-          logger.succeedSpinner(result.cached ? `${prefix}${filename} ${pc.dim("(cached)")}` : `${prefix}${filename}`);
-          results.push({ file: filePath, success: true });
+          logger.succeedSpinner(result.cached ? `${prefix}${label} ${pc.dim("(cached)")}` : `${prefix}${label}`);
+          results.push({ file: label, success: true });
 
           process.stdout.write(result.markdown);
-          if (imagePaths.length > 1) {
+          if (workItems.length > 1) {
             process.stdout.write("\n---\n\n");
           }
         } catch (err) {
           logger.stopSpinner();
           const msg = err instanceof Error ? err.message : "Unknown error";
-          results.push({ file: filePath, success: false, error: msg });
-          logger.error(`${filename}: ${msg}`);
+          results.push({ file: label, success: false, error: msg });
+          logger.error(`${label}: ${msg}`);
         }
       }
 
@@ -228,7 +292,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       if (failed > 0) process.exit(2);
     } else {
       // Sidecar mode (default) — sequential for clean spinner output
-      const total = imagePaths.length;
+      const total = workItems.length;
       const results: (BatchResult & { cached?: boolean })[] = [];
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
@@ -236,25 +300,23 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       const startTime = Date.now();
 
       logger.blank();
-      for (let i = 0; i < imagePaths.length; i++) {
-        const filePath = imagePaths[i];
-        const filename = filePath.split("/").pop() ?? filePath;
+      for (let i = 0; i < workItems.length; i++) {
+        const item = workItems[i];
+        const label = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : item.url;
+        const filename = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : undefined;
         const prefix = total > 1 ? `${pc.dim(`[${i + 1}/${total}]`)} ` : "";
         const barLine = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
 
         try {
-          logger.startSpinner(`${prefix}Analyzing ${accent(filename)}${barLine}`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${barLine}`);
 
-          const result = await processFile(filePath, {
-            model: opts.model,
-            persona: opts.persona,
-            prompt: opts.prompt,
-            note: opts.note,
-            template,
-            templateName: opts.template,
-            noCache: opts.cache === false,
-            provider,
-          });
+          let result;
+          if (item.kind === "file") {
+            result = await processFile(item.path, processOpts);
+          } else {
+            const fetched = await fetchUrl(item.url);
+            result = await processBuffer(fetched, processOpts);
+          }
 
           if (result.usage) {
             totalInputTokens += result.usage.inputTokens;
@@ -264,20 +326,36 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
             resolvedModel = result.model;
           }
 
-          const outPath = sidecarPath(filePath, opts.output);
-
-          if (!result.cached) {
-            const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
-            logger.updateSpinner(`${prefix}Writing ${accent(filename)}${writeBar}`);
+          if (item.kind === "file") {
+            const outPath = sidecarPath(item.path, opts.output);
+            if (!result.cached) {
+              const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
+              logger.updateSpinner(`${prefix}Writing ${accent(filename!)}${writeBar}`);
+            }
+            await writeMarkdown(result.markdown, outPath);
+            results.push({ file: item.path, success: true, outputPath: outPath, cached: result.cached });
+            logger.succeedSpinner(
+              result.cached
+                ? `${prefix}${filename} ${pc.dim("→ .md (cached)")}`
+                : `${prefix}${filename} ${pc.dim("→ .md")}`
+            );
+          } else {
+            // URL: write sidecar based on result filename, or output to current dir
+            const outDir = opts.output ?? ".";
+            const outName = result.metadata.basename + ".md";
+            const outPath = resolve(outDir, outName);
+            if (!result.cached) {
+              const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
+              logger.updateSpinner(`${prefix}Writing ${accent(outName)}${writeBar}`);
+            }
+            await writeMarkdown(result.markdown, outPath);
+            results.push({ file: item.url, success: true, outputPath: outPath, cached: result.cached });
+            logger.succeedSpinner(
+              result.cached
+                ? `${prefix}${label} ${pc.dim(`→ ${outName} (cached)`)}`
+                : `${prefix}${label} ${pc.dim(`→ ${outName}`)}`
+            );
           }
-          await writeMarkdown(result.markdown, outPath);
-
-          results.push({ file: filePath, success: true, outputPath: outPath, cached: result.cached });
-          logger.succeedSpinner(
-            result.cached
-              ? `${prefix}${filename} ${pc.dim("→ .md (cached)")}`
-              : `${prefix}${filename} ${pc.dim("→ .md")}`
-          );
 
           if (opts.verbose) {
             logger.info(`Format: ${result.metadata.format} | ${result.metadata.width}x${result.metadata.height} | ${result.metadata.sizeHuman}`);
@@ -288,7 +366,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
         } catch (err) {
           logger.stopSpinner();
           const msg = err instanceof Error ? err.message : "Unknown error";
-          results.push({ file: filePath, success: false, error: msg });
+          results.push({ file: label, success: false, error: msg });
           handleError(err);
         }
       }
@@ -398,6 +476,81 @@ cacheCmd
     }
     logger.blank();
   });
+
+// Watch subcommand
+program
+  .command("watch")
+  .description("Watch a directory and auto-process new/changed images")
+  .argument("<dir>", "Directory to watch")
+  .option("--provider <provider>", "AI provider: anthropic, openai")
+  .option("-m, --model <model>", "AI model to use")
+  .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
+  .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
+  .option("--prompt <prompt>", "Custom prompt (overrides persona)")
+  .option("-n, --note <note>", "Focus directive")
+  .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
+  .option("-o, --output <dir>", "Output directory for .md files")
+  .option("--no-cache", "Skip cache, force re-processing")
+  .option("-v, --verbose", "Show detailed processing info")
+  .action(async (dir: string, cliOpts) => {
+    const config = await loadConfig();
+    const opts = mergeOptions(cliOpts, config);
+    resolveTier(opts, config);
+
+    if (opts.tier && !TIER_MAP[opts.tier as string]) {
+      logger.blank();
+      logger.error(`Unknown tier: ${opts.tier}. Supported: ${Object.keys(TIER_MAP).join(", ")}`);
+      logger.blank();
+      process.exit(1);
+    }
+
+    const providerName = (opts.provider as string) ?? "anthropic";
+    if (providerName !== "anthropic" && providerName !== "openai") {
+      logger.blank();
+      logger.error(`Unknown provider: ${providerName}. Supported: anthropic, openai`);
+      logger.blank();
+      process.exit(1);
+    }
+    const defaultModel = providerName === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
+    if (!opts.model) opts.model = defaultModel;
+
+    const apiKeyEnv = providerName === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
+    if (!process.env[apiKeyEnv]) {
+      logger.blank();
+      logger.error(`${apiKeyEnv} is required for the ${providerName} provider.`);
+      logger.blank();
+      process.exit(1);
+    }
+
+    const provider: Provider = providerName === "openai" ? new OpenAIProvider() : new AnthropicProvider();
+
+    // Dynamic import to keep startup fast
+    const { startWatch } = await import("./watch.js");
+    await startWatch(dir, {
+      provider,
+      providerName,
+      model: opts.model as string,
+      persona: opts.persona as string | undefined,
+      prompt: opts.prompt as string | undefined,
+      note: opts.note as string | undefined,
+      template: opts.template as string | undefined,
+      output: opts.output as string | undefined,
+      noCache: opts.cache === false,
+      verbose: opts.verbose === true,
+    });
+  });
+
+async function fetchUrl(url: string): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
+  try {
+    return await fetchImage(url);
+  } catch (err) {
+    if (err instanceof ContentTypeError) {
+      // Not an image — try Playwright screenshot
+      return await screenshotPage(url);
+    }
+    throw err;
+  }
+}
 
 async function resolveFileArgs(args: string[]): Promise<string[]> {
   if (args.length <= 1) return args;

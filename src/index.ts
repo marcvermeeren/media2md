@@ -1,5 +1,6 @@
-export { processFile, type ProcessOptions, type ProcessResult } from "./processor.js";
-export { extractMetadata, isSupportedFormat, getSupportedFormats, mimeTypeFromExtension, type ImageMetadata, type ExtractResult } from "./extractors/metadata.js";
+export { processFile, processBuffer, type ProcessOptions, type ProcessResult, type BufferInput } from "./processor.js";
+export { extractMetadata, extractMetadataFromBuffer, isSupportedFormat, getSupportedFormats, mimeTypeFromExtension, type ImageMetadata, type ExtractResult } from "./extractors/metadata.js";
+export { isUrl, looksLikeImageUrl, filenameFromUrl, fetchImage, screenshotPage, ContentTypeError } from "./url.js";
 export { parseResponse, type ParsedResponse } from "./parser.js";
 export { renderTemplate } from "./templates/engine.js";
 export { DEFAULT_TEMPLATE, MINIMAL_TEMPLATE, ALT_TEXT_TEMPLATE, DETAILED_TEMPLATE, BUILTIN_TEMPLATES } from "./templates/builtins.js";
@@ -9,7 +10,9 @@ export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/buil
 export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
 export { sidecarPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
 export { buildCacheKey, getCached, setCached, clearCache, getCacheStats, type CacheEntry, type CacheStats } from "./cache/store.js";
-export { loadConfig, mergeOptions, type M2mdConfig } from "./config.js";
-export { estimateCost, estimateImageTokens, formatCost, type CostEstimate } from "./cost.js";
+export { loadConfig, mergeOptions, resolveTier, TIER_MAP, type M2mdConfig } from "./config.js";
+export { startWatch, type WatchOptions } from "./watch.js";
+export { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel, type CostEstimate } from "./cost.js";
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
+export { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
 export type { Provider, ImageInput, AnalyzeOptions, ProviderResponse } from "./providers/types.js";

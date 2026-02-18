@@ -6,6 +6,8 @@ export interface ImageInput {
 
 export interface ProviderResponse {
   rawText: string;
+  usage?: { inputTokens: number; outputTokens: number };
+  model?: string;
 }
 
 export interface AnalyzeOptions {

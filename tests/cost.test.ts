@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { estimateImageTokens, estimateCost, formatCost } from "../src/cost.js";
+import { estimateImageTokens, estimateCost, formatCost, calculateCost, formatModel } from "../src/cost.js";
 import type { ImageMetadata } from "../src/extractors/metadata.js";
 
 function makeMetadata(width: number, height: number): ImageMetadata {
@@ -107,5 +107,54 @@ describe("formatCost", () => {
     );
     const output = formatCost(estimate);
     expect(output).toContain("<$0.01");
+  });
+});
+
+describe("calculateCost", () => {
+  it("calculates cost from actual token counts for sonnet", () => {
+    // 10K input * $3/M + 1K output * $15/M = $0.03 + $0.015 = $0.045
+    const cost = calculateCost(10_000, 1_000, "claude-sonnet-4-5-20250929");
+    expect(cost).toBeCloseTo(0.045, 4);
+  });
+
+  it("calculates cost for opus at higher rate", () => {
+    // 10K input * $15/M + 1K output * $75/M = $0.15 + $0.075 = $0.225
+    const cost = calculateCost(10_000, 1_000, "claude-opus-4-6");
+    expect(cost).toBeCloseTo(0.225, 4);
+  });
+
+  it("calculates cost for haiku at lower rate", () => {
+    // 10K input * $0.8/M + 1K output * $4/M = $0.008 + $0.004 = $0.012
+    const cost = calculateCost(10_000, 1_000, "claude-haiku-4-5-20251001");
+    expect(cost).toBeCloseTo(0.012, 4);
+  });
+
+  it("falls back to default pricing for unknown model", () => {
+    const cost = calculateCost(10_000, 1_000, "unknown-model");
+    // Uses DEFAULT_PRICING (same as sonnet)
+    expect(cost).toBeCloseTo(0.045, 4);
+  });
+
+  it("returns zero for zero tokens", () => {
+    expect(calculateCost(0, 0, "claude-sonnet-4-5-20250929")).toBe(0);
+  });
+});
+
+describe("formatModel", () => {
+  it("shortens sonnet model ID", () => {
+    expect(formatModel("claude-sonnet-4-5-20250929")).toBe("sonnet-4-5");
+  });
+
+  it("shortens opus model ID", () => {
+    expect(formatModel("claude-opus-4-6")).toBe("opus-4-6");
+  });
+
+  it("shortens haiku model ID", () => {
+    expect(formatModel("claude-haiku-4-5-20251001")).toBe("haiku-4-5");
+  });
+
+  it("returns non-Claude models as-is", () => {
+    expect(formatModel("gpt-4o")).toBe("gpt-4o");
+    expect(formatModel("gpt-4o-mini")).toBe("gpt-4o-mini");
   });
 });

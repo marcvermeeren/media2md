@@ -21,7 +21,7 @@ class CountingProvider implements Provider {
   ): Promise<ProviderResponse> {
     this.callCount++;
     return {
-      rawText: `DESCRIPTION:\nCall number ${this.callCount}.\n\nEXTRACTED_TEXT:\nNone`,
+      rawText: `TYPE:\nphoto\n\nSUBJECT:\nCall number ${this.callCount}\n\nDESCRIPTION:\nCall number ${this.callCount}.\n\nEXTRACTED_TEXT:\nNone`,
     };
   }
 }
@@ -45,6 +45,8 @@ describe("cache integration with processor", () => {
     expect(provider.callCount).toBe(1); // NOT incremented
     expect(second.description).toBe(first.description);
     expect(second.markdown).toBe(first.markdown);
+    expect(second.type).toBe(first.type);
+    expect(second.subject).toBe(first.subject);
   });
 
   it("--no-cache forces provider call even with cached result", async () => {

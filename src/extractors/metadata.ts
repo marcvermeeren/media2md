@@ -55,6 +55,47 @@ export function mimeTypeFromExtension(
   throw new Error(`Unsupported extension: ${ext}`);
 }
 
+/**
+ * Extract metadata from a buffer (for URL-fetched or in-memory images).
+ * Skips file I/O — takes buffer + filename directly.
+ */
+export function extractMetadataFromBuffer(
+  buffer: Buffer,
+  filename: string,
+  mimeType?: string
+): ImageMetadata {
+  const ext = mimeType ? extensionFromMimeType(mimeType) : extname(filename).toLowerCase();
+  let dimensions: { width?: number; height?: number; type?: string } = {};
+  try {
+    dimensions = imageSize(buffer);
+  } catch {
+    // Unknown format — leave dimensions undefined
+  }
+
+  const hash = createHash("sha256").update(buffer).digest("hex");
+  const name = basename(filename);
+
+  return {
+    filename: name,
+    basename: basename(name, extname(name)),
+    extension: ext,
+    format: FORMAT_MAP[dimensions.type ?? ext.slice(1)] ?? dimensions.type ?? "unknown",
+    width: dimensions.width,
+    height: dimensions.height,
+    sizeBytes: buffer.length,
+    sizeHuman: humanSize(buffer.length),
+    sha256: hash,
+  };
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  if (mimeType.includes("png")) return ".png";
+  if (mimeType.includes("jpeg") || mimeType.includes("jpg")) return ".jpg";
+  if (mimeType.includes("webp")) return ".webp";
+  if (mimeType.includes("gif")) return ".gif";
+  return ".png";
+}
+
 export async function extractMetadata(filePath: string): Promise<ExtractResult> {
   const [buffer, fileStat] = await Promise.all([
     readFile(filePath),

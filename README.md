@@ -17,6 +17,9 @@ m2md ./assets/
 
 # Print to stdout (pipe to clipboard, another tool, etc.)
 m2md screenshot.png --stdout | pbcopy
+
+# Describe an image from a URL
+m2md https://example.com/photo.png
 ```
 
 ## Why
@@ -25,16 +28,20 @@ Images are black boxes to AI tools, search, and text workflows. You can't grep a
 
 ## Features
 
-- AI-powered image descriptions via Claude vision
+- AI-powered image descriptions via Claude or OpenAI vision
 - Text extraction (OCR) from screenshots, documents, diagrams
 - YAML frontmatter with metadata (dimensions, format, hash)
 - Sidecar `.md` files next to images — makes directories greppable
+- Provider tiers — `--tier fast` for cheap/quick, `--tier quality` for best results
+- URL support — pass image URLs directly, or screenshot web pages via Playwright
+- Watch mode — auto-process new/changed images in a directory
 - 5 built-in personas (brand, design, developer, accessibility, marketing)
 - Focus directives (`--note`) that layer on top of any prompt mode
-- Customizable templates (default, minimal, alt-text, detailed, or your own)
+- 4 built-in templates (default, minimal, alt-text, detailed) plus custom templates
 - Content-hash caching — skip unchanged files automatically
-- Cost estimation before processing (`--estimate`)
+- Cost estimation before processing (`--estimate`, `--dry-run`)
 - Batch processing with concurrency control
+- MCP server for AI agent integration (Claude Desktop, etc.)
 - Programmatic API for use as a library
 
 ## Usage
@@ -55,6 +62,61 @@ m2md ./assets/ -r                       # recursive
 m2md ./assets/ -r -o ./docs/            # recursive, custom output dir
 m2md ./assets/*.png                     # glob
 ```
+
+### Tiers
+
+Quick presets instead of picking provider + model:
+
+```bash
+m2md screenshot.png --tier fast         # gpt-4o-mini — quick + cheap
+m2md screenshot.png --tier quality      # claude-sonnet — best results (default behavior)
+```
+
+| Tier | Provider | Model | Best for |
+|------|----------|-------|----------|
+| `fast` | OpenAI | gpt-4o-mini | Quick passes, large batches, drafts |
+| `quality` | Anthropic | claude-sonnet | Final output, detailed descriptions |
+
+Explicit `--provider` / `--model` flags always override `--tier`.
+
+### Providers
+
+By default m2md uses Anthropic's Claude. Switch to OpenAI with `--provider`:
+
+```bash
+m2md screenshot.png                             # Anthropic Claude (default)
+m2md screenshot.png --provider openai           # OpenAI GPT-4o
+m2md screenshot.png --provider openai -m gpt-4o-mini  # specific model
+```
+
+### URLs
+
+Pass image URLs directly — m2md downloads and processes them:
+
+```bash
+m2md https://example.com/screenshot.png                # image URL → download + describe
+m2md https://example.com/landing-page                  # non-image URL → screenshot via Playwright
+m2md screenshot.png https://example.com/photo.jpg      # mix local files + URLs
+```
+
+For non-image URLs, m2md takes a full-page screenshot using Playwright (optional dependency):
+
+```bash
+npm install playwright && npx playwright install chromium
+```
+
+### Watch mode
+
+Auto-process new and changed images in a directory:
+
+```bash
+m2md watch ./assets/                    # watch for new/changed images
+m2md watch ./assets/ --tier fast        # watch with fast tier
+m2md watch ./assets/ -o ./docs/         # custom output directory
+m2md watch ./assets/ --persona design   # watch with persona
+```
+
+On startup, existing images without a `.md` sidecar are processed. Then m2md watches for new/changed files and processes them automatically. Press `Ctrl+C` to stop.
 
 ### Personas
 
@@ -100,15 +162,15 @@ m2md ./illos/ --prompt "art critique" -n "line weight and hatching"
 m2md screenshot.png                        # default (frontmatter + description + text)
 m2md screenshot.png --template minimal     # description + source link
 m2md screenshot.png --template alt-text    # just a description string
-m2md screenshot.png --template detailed    # full metadata table
-m2md screenshot.png --template ./my.md     # custom Handlebars template
+m2md screenshot.png --template detailed    # full metadata table + image embed
+m2md screenshot.png --template ./my.md     # custom template file
 ```
 
 Template variables available in custom templates:
 
 | Variable | Description |
 |----------|-------------|
-| `{{type}}` | Image type (screenshot, photo, diagram, etc.) |
+| `{{type}}` | Image type (screenshot, photo, diagram, chart, logo, etc.) |
 | `{{subject}}` | One-line summary |
 | `{{description}}` | AI-generated structured description |
 | `{{extractedText}}` | All visible text, grouped by context |
@@ -118,13 +180,10 @@ Template variables available in custom templates:
 | `{{basename}}` | Filename without extension |
 | `{{format}}` | File format (PNG, JPEG, WebP, GIF) |
 | `{{dimensions}}` | Width x Height |
-| `{{width}}` | Image width |
-| `{{height}}` | Image height |
-| `{{sizeHuman}}` | Human-readable file size |
-| `{{sizeBytes}}` | File size in bytes |
+| `{{width}}` / `{{height}}` | Image dimensions |
+| `{{sizeHuman}}` / `{{sizeBytes}}` | File size |
 | `{{sha256}}` | Content hash |
-| `{{processedDate}}` | ISO date |
-| `{{datetime}}` | ISO datetime |
+| `{{processedDate}}` / `{{datetime}}` | Processing timestamp |
 | `{{model}}` | AI model used |
 | `{{persona}}` | Persona used |
 | `{{note}}` | Focus directive |
@@ -147,15 +206,17 @@ Preview what a batch will cost before calling the API:
 
 ```bash
 m2md ./assets/ --estimate     # show token/cost estimate
-m2md ./assets/ --dry-run      # list files and cache status
+m2md ./assets/ --dry-run      # list files with cache status + estimates
 ```
+
+Both work without an API key so you can preview before committing.
 
 ### Other flags
 
 ```bash
 m2md screenshot.png -m claude-sonnet-4-5-20250929   # specific model
 m2md ./assets/ --concurrency 10                      # parallel API calls (default: 5)
-m2md screenshot.png -v                               # verbose output
+m2md screenshot.png -v                               # verbose output (tokens, cost, timing)
 ```
 
 ## Configuration
@@ -166,6 +227,7 @@ Create an `m2md.config.json` (or `.m2mdrc`, `.m2mdrc.json`, `.m2mdrc.yaml`) in y
 
 ```json
 {
+  "tier": "fast",
   "persona": "design",
   "note": "capture style, palette, spacing tokens",
   "output": "./docs",
@@ -177,7 +239,9 @@ All options are optional — only set what you want to override:
 
 | Key | What it does | Default |
 |-----|-------------|---------|
-| `model` | AI model to use | `claude-sonnet-4-5-20250929` |
+| `provider` | AI provider (`anthropic`, `openai`) | `anthropic` |
+| `model` | AI model to use | provider default |
+| `tier` | Preset tier (`fast`, `quality`) | none |
 | `persona` | Built-in persona lens | none (base prompt) |
 | `prompt` | Custom prompt (overrides persona) | none |
 | `note` | Additive focus directive | none |
@@ -187,7 +251,9 @@ All options are optional — only set what you want to override:
 | `cache` | Cache results by content hash | `true` |
 | `concurrency` | Max parallel API calls | `5` |
 
-CLI flags always take precedence over config file values. You can also put config under an `"m2md"` key in `package.json`.
+Precedence: CLI flags > `--tier` > config file > defaults.
+
+You can also put config under an `"m2md"` key in `package.json`.
 
 ## Setup
 
@@ -195,12 +261,65 @@ CLI flags always take precedence over config file values. You can also put confi
 # 1. Install
 npm install -g m2md
 
-# 2. Set your API key
-export ANTHROPIC_API_KEY="sk-ant-..."
+# 2. Set your API key (one or both)
+export ANTHROPIC_API_KEY="sk-ant-..."   # for Anthropic / --tier quality (default)
+export OPENAI_API_KEY="sk-..."          # for OpenAI / --tier fast
 
 # 3. Verify
 m2md setup
 ```
+
+## MCP server
+
+m2md includes an MCP server (`m2md-mcp`) that exposes a `describe_image` tool over stdio. This lets AI agents — like Claude Desktop or any MCP client — analyze images directly.
+
+### Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "m2md": {
+      "command": "m2md-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+### Claude Code
+
+Add to your `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "m2md": {
+      "command": "m2md-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+### Tool: `describe_image`
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `filePath` | Yes | Absolute path to the image file |
+| `provider` | No | `anthropic` or `openai` |
+| `model` | No | AI model to use |
+| `persona` | No | brand, design, developer, accessibility, marketing |
+| `prompt` | No | Custom prompt (overrides persona) |
+| `note` | No | Focus directive |
+| `template` | No | default, minimal, alt-text, detailed |
+
+Returns the rendered markdown as text content. Shares the same cache as the CLI.
 
 ## Supported formats
 
@@ -209,10 +328,11 @@ PNG, JPEG, WebP, GIF
 ## Programmatic API
 
 ```typescript
-import { processFile, AnthropicProvider } from "m2md";
+import { processFile, processBuffer, AnthropicProvider, OpenAIProvider } from "m2md";
 
+// Process a local file
 const result = await processFile("screenshot.png", {
-  provider: new AnthropicProvider(),
+  provider: new AnthropicProvider(),   // or new OpenAIProvider()
   persona: "design",
   note: "spacing tokens",
 });
@@ -221,6 +341,12 @@ result.description;    // AI-generated description
 result.extractedText;  // extracted text
 result.metadata;       // { width, height, format, sizeHuman, sha256, ... }
 result.markdown;       // rendered markdown string
+
+// Process an in-memory buffer (e.g. from a URL fetch)
+const bufferResult = await processBuffer(
+  { buffer: imageBuffer, filename: "photo.png", mimeType: "image/png" },
+  { provider: new OpenAIProvider() }
+);
 ```
 
 ## License
