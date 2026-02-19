@@ -118,6 +118,19 @@ m2md watch ./assets/ --persona design   # watch with persona
 
 On startup, existing images without a `.md` sidecar are processed. Then m2md watches for new/changed files and processes them automatically. Press `Ctrl+C` to stop.
 
+### Compare mode
+
+Compare two or more images in a single API call:
+
+```bash
+m2md compare before.png after.png                # compare two images
+m2md compare v1.png v2.png v3.png                 # compare multiple versions
+m2md compare a.png b.png -n "focus on typography" # with focus directive
+m2md compare a.png b.png -o comparison.md         # write to file
+```
+
+Outputs structured markdown with Summary, Similarities, Differences, and Verdict sections. Images are labeled A, B, C, etc.
+
 ### Personas
 
 Built-in personas shape how the AI describes images:

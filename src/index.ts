@@ -5,7 +5,7 @@ export { parseResponse, type ParsedResponse } from "./parser.js";
 export { renderTemplate, stripFrontmatter } from "./templates/engine.js";
 export { DEFAULT_TEMPLATE, MINIMAL_TEMPLATE, ALT_TEXT_TEMPLATE, DETAILED_TEMPLATE, BUILTIN_TEMPLATES } from "./templates/builtins.js";
 export { loadTemplate } from "./templates/loader.js";
-export { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
+export { buildSystemPrompt, buildUserPrompt, buildCompareSystemPrompt, buildCompareUserPrompt } from "./prompts.js";
 export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/builtins.js";
 export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
 export { sidecarPath, formatOutputPath, writeMarkdown, type WriteOptions } from "./output/writer.js";

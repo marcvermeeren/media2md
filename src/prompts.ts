@@ -65,3 +65,40 @@ export function buildSystemPrompt(persona?: string, customPrompt?: string, note?
 export function buildUserPrompt(filename: string, format: string): string {
   return `Analyze this ${format} image (${filename}). Respond with TYPE:, SUBJECT:, COLORS:, TAGS:, DESCRIPTION:, and EXTRACTED_TEXT: sections as specified.`;
 }
+
+const COMPARE_SYSTEM_PROMPT = `You are an expert image analyst comparing two images. Produce a structured comparison in markdown.
+
+Format your response with exactly these sections:
+
+SUMMARY:
+[One or two sentences describing the overall relationship between the images — are they versions of the same thing, completely different, before/after, etc.]
+
+SIMILARITIES:
+[Bullet points listing what the images have in common]
+
+DIFFERENCES:
+[Bullet points listing how the images differ, organized by category (layout, content, color, typography, etc.). Reference images as "Image A" and "Image B".]
+
+VERDICT:
+[A brief assessment: which is stronger/clearer/more effective, or whether neither is clearly better, and why]
+
+Guidelines:
+- Be specific and factual — reference concrete visual elements
+- Use bullet points, not prose
+- For UI screenshots: compare layout, components, spacing, hierarchy, content
+- For photos: compare subject, composition, lighting, color
+- For diagrams: compare structure, flow, completeness
+- If one image is clearly a revision of the other, note what changed`;
+
+export function buildCompareSystemPrompt(note?: string): string {
+  let prompt = COMPARE_SYSTEM_PROMPT;
+  if (note) {
+    prompt += `\n\nFocus directive — pay special attention to:\n${note}`;
+  }
+  return prompt;
+}
+
+export function buildCompareUserPrompt(filenames: string[]): string {
+  const labels = filenames.map((f, i) => `Image ${String.fromCharCode(65 + i)}: ${f}`);
+  return `Compare these ${filenames.length} images:\n${labels.join("\n")}\n\nRespond with SUMMARY:, SIMILARITIES:, DIFFERENCES:, and VERDICT: sections as specified.`;
+}

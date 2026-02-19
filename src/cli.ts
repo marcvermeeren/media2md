@@ -14,9 +14,10 @@ import { getPersonaNames } from "./personas/builtins.js";
 import { discoverImages, runBatch, type BatchResult } from "./batch.js";
 import { sidecarPath, formatOutputPath, writeMarkdown } from "./output/writer.js";
 import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/store.js";
-import { extractMetadata } from "./extractors/metadata.js";
+import { extractMetadata, mimeTypeFromExtension } from "./extractors/metadata.js";
 import { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel } from "./cost.js";
 import { isUrl, fetchImage, screenshotPage, ContentTypeError } from "./url.js";
+import { buildCompareSystemPrompt, buildCompareUserPrompt } from "./prompts.js";
 import * as logger from "./utils/logger.js";
 import { brand, accent } from "./utils/logger.js";
 
@@ -571,6 +572,135 @@ program
       verbose: opts.verbose === true,
     });
   });
+
+// Compare subcommand
+program
+  .command("compare")
+  .description("Compare two or more images side by side")
+  .argument("<files...>", "Image files to compare (2 or more)")
+  .option("--provider <provider>", "AI provider: anthropic, openai")
+  .option("-m, --model <model>", "AI model to use")
+  .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
+  .option("-n, --note <note>", "Focus directive")
+  .option("-o, --output <file>", "Output file path (default: stdout)")
+  .action(async (files: string[], cliOpts) => {
+    const config = await loadConfig();
+    const opts = mergeOptions(cliOpts, config);
+    resolveTier(opts, config);
+
+    if (files.length < 2) {
+      logger.blank();
+      logger.error("Compare requires at least 2 images.");
+      logger.blank();
+      process.exit(1);
+    }
+
+    const providerName = (opts.provider as string) ?? "anthropic";
+    if (providerName !== "anthropic" && providerName !== "openai") {
+      logger.blank();
+      logger.error(`Unknown provider: ${providerName}. Supported: anthropic, openai`);
+      logger.blank();
+      process.exit(1);
+    }
+    const defaultModel = providerName === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
+    if (!opts.model) opts.model = defaultModel;
+
+    const apiKeyEnv = providerName === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
+    if (!process.env[apiKeyEnv]) {
+      logger.blank();
+      logger.error(`${apiKeyEnv} is required for the ${providerName} provider.`);
+      logger.blank();
+      process.exit(1);
+    }
+
+    const provider: Provider = providerName === "openai" ? new OpenAIProvider() : new AnthropicProvider();
+
+    try {
+      // Load images
+      const images: { buffer: Buffer; mimeType: string; filename: string }[] = [];
+      for (const file of files) {
+        const absPath = resolve(file);
+        const { metadata, buffer } = await extractMetadata(absPath);
+        images.push({
+          buffer,
+          mimeType: mimeTypeFromExtension(metadata.extension),
+          filename: metadata.filename,
+        });
+      }
+
+      const filenames = images.map((img) => img.filename);
+      const labels = filenames.map((f, i) => `${accent(f)} (${String.fromCharCode(65 + i)})`);
+
+      logger.blank();
+      logger.startSpinner(`Comparing ${labels.join(pc.dim(" vs "))}`);
+
+      const systemPrompt = buildCompareSystemPrompt(opts.note as string | undefined);
+      const userPrompt = buildCompareUserPrompt(filenames);
+
+      const response = await provider.compare(
+        images.map((img) => ({
+          buffer: img.buffer,
+          mimeType: img.mimeType as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+          filename: img.filename,
+        })),
+        { model: opts.model as string, systemPrompt, userPrompt }
+      );
+
+      logger.succeedSpinner(`Compared ${filenames.join(pc.dim(" vs "))}`);
+
+      // Format the comparison markdown
+      const markdown = formatCompareMarkdown(response.rawText, filenames);
+
+      if (opts.output) {
+        const { writeMarkdown } = await import("./output/writer.js");
+        await writeMarkdown(markdown, resolve(opts.output as string));
+        logger.success(`Written to ${accent(opts.output as string)}`);
+      } else {
+        process.stdout.write(markdown);
+      }
+
+      if (response.usage) {
+        const modelLabel = response.model ? formatModel(response.model) : formatModel(opts.model as string);
+        const totalTokens = response.usage.inputTokens + response.usage.outputTokens;
+        const tokenStr = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}K` : totalTokens.toString();
+        logger.info(pc.dim(`${modelLabel} · ${tokenStr} tokens`));
+      }
+      logger.blank();
+    } catch (err) {
+      logger.stopSpinner();
+      handleError(err);
+      process.exit(1);
+    }
+  });
+
+function formatCompareMarkdown(rawText: string, filenames: string[]): string {
+  const labels = filenames.map((f, i) => `- **Image ${String.fromCharCode(65 + i)}:** ${f}`);
+  const header = `# Comparison\n\n${labels.join("\n")}\n\n`;
+
+  // Parse the structured response into markdown sections
+  const sections: { key: string; heading: string }[] = [
+    { key: "SUMMARY", heading: "## Summary" },
+    { key: "SIMILARITIES", heading: "## Similarities" },
+    { key: "DIFFERENCES", heading: "## Differences" },
+    { key: "VERDICT", heading: "## Verdict" },
+  ];
+
+  let body = "";
+  for (const { key, heading } of sections) {
+    const regex = new RegExp(`${key}:\\s*\\n([\\s\\S]*?)(?=\\n(?:SUMMARY|SIMILARITIES|DIFFERENCES|VERDICT):|$)`);
+    const match = rawText.match(regex);
+    if (match) {
+      body += `${heading}\n\n${match[1].trim()}\n\n`;
+    }
+  }
+
+  // Fallback: if parsing fails, just use raw text
+  if (!body.trim()) {
+    body = rawText;
+  }
+
+  return header + body.trimEnd() + "\n";
+}
 
 async function fetchUrl(url: string): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
   try {

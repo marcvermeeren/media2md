@@ -18,4 +18,5 @@ export interface AnalyzeOptions {
 
 export interface Provider {
   analyze(image: ImageInput, options: AnalyzeOptions): Promise<ProviderResponse>;
+  compare(images: ImageInput[], options: AnalyzeOptions): Promise<ProviderResponse>;
 }
