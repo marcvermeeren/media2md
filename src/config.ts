@@ -9,6 +9,8 @@ export interface M2mdConfig {
   note?: string;
   template?: string;
   output?: string;
+  name?: string;
+  noFrontmatter?: boolean;
   recursive?: boolean;
   cache?: boolean;
   concurrency?: number;
@@ -85,6 +87,17 @@ export function mergeOptions<T extends Record<string, unknown>>(
   const merged = { ...cliOpts };
 
   for (const [key, value] of Object.entries(config)) {
+    // Map config noFrontmatter → Commander's frontmatter flag
+    if (key === "noFrontmatter") {
+      if (merged["frontmatter"] === undefined || merged["frontmatter"] === true) {
+        // CLI didn't explicitly set --no-frontmatter, apply config
+        if (value === true) {
+          (merged as Record<string, unknown>)["frontmatter"] = false;
+        }
+      }
+      continue;
+    }
+
     // Only apply config value if CLI didn't set it
     // Commander sets defaults, so check if it's still the default
     if (merged[key] === undefined || merged[key] === null) {

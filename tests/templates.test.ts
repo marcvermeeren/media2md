@@ -128,6 +128,15 @@ describe("stripFrontmatter", () => {
     expect(result).toBe("Content\n\n---\n\nMore content\n");
   });
 
+  it("returns empty string for empty input", () => {
+    expect(stripFrontmatter("")).toBe("");
+  });
+
+  it("does not strip --- used as horizontal rule (no frontmatter)", () => {
+    const input = "# Heading\n\nSome text\n\n---\n\nMore text\n";
+    expect(stripFrontmatter(input)).toBe(input);
+  });
+
   it("works with default template output", () => {
     const rendered = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
     const stripped = stripFrontmatter(rendered);

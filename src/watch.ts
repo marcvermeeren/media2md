@@ -85,6 +85,7 @@ export async function startWatch(
   logger.info(`Watching for changes... ${pc.dim("(Ctrl+C to stop)")}`);
   logger.blank();
 
+  const startTime = Date.now();
   const queue = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -121,9 +122,13 @@ export async function startWatch(
   const shutdown = () => {
     try {
       logger.stopSpinner();
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+      const elapsedLabel = Number(elapsed) >= 60
+        ? `${Math.floor(Number(elapsed) / 60)}m${Number(elapsed) % 60}s`
+        : `${elapsed}s`;
       logger.blank();
       logger.success(
-        `Watch session complete: ${brand(String(watchCount))} file${watchCount !== 1 ? "s" : ""} processed`
+        `Watch session complete: ${brand(String(watchCount))} file${watchCount !== 1 ? "s" : ""} processed ${pc.dim(`· ${elapsedLabel}`)}`
       );
       logger.blank();
     } catch {}

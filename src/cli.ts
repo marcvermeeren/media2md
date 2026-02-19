@@ -17,8 +17,7 @@ import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/sto
 import { extractMetadata, mimeTypeFromExtension } from "./extractors/metadata.js";
 import { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel } from "./cost.js";
 import { isUrl, fetchImage, screenshotPage, ContentTypeError } from "./url.js";
-import { buildCompareSystemPrompt, buildCompareUserPrompt } from "./prompts.js";
-import { readClipboardImage } from "./clipboard.js";
+import { buildCompareSystemPrompt, buildCompareUserPrompt, formatCompareMarkdown } from "./prompts.js";
 import * as logger from "./utils/logger.js";
 import { brand, accent } from "./utils/logger.js";
 
@@ -34,8 +33,7 @@ program
   })
   .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.1.0")}\n`)
   .argument("[files...]", "Image file(s) or directory to process")
-  .option("--clipboard", "Grab image from system clipboard")
-  .option("--provider <provider>", "AI provider: anthropic, openai")
+.option("--provider <provider>", "AI provider: anthropic, openai")
   .option("-m, --model <model>", "AI model to use")
   .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
   .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
@@ -67,8 +65,6 @@ ${brand(pc.bold("Examples:"))}
   ${pc.dim("$")} m2md photo.jpg --provider openai         ${pc.dim("# use OpenAI GPT-4o")}
   ${pc.dim("$")} m2md photo.jpg --tier fast              ${pc.dim("# quick + cheap (gpt-4o-mini)")}
   ${pc.dim("$")} m2md photo.jpg --tier quality           ${pc.dim("# best results (claude-sonnet)")}
-  ${pc.dim("$")} m2md --clipboard                         ${pc.dim("# describe image from clipboard")}
-  ${pc.dim("$")} m2md --clipboard -o ./docs/              ${pc.dim("# clipboard → file in docs/")}
 
 ${brand(pc.bold("Personas:"))} ${getPersonaNames().map((n) => accent(n)).join(pc.dim(", "))}
 
@@ -112,28 +108,9 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       opts.model = defaultModel;
     }
 
-    // Handle --clipboard: read image from clipboard into a temp file
-    if (opts.clipboard) {
-      if (files.length > 0) {
-        logger.blank();
-        logger.error("Cannot use --clipboard with file arguments.");
-        logger.blank();
-        process.exit(1);
-      }
-      try {
-        const clipPath = await readClipboardImage();
-        files = [clipPath];
-      } catch (err) {
-        logger.blank();
-        logger.error((err as Error).message);
-        logger.blank();
-        process.exit(1);
-      }
-    }
-
     if (files.length === 0) {
       logger.blank();
-      logger.error("No input specified. Provide image files or use --clipboard.");
+      logger.error("No input specified. Provide image files or a URL.");
       logger.blank();
       process.exit(1);
     }
@@ -263,56 +240,139 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
 
     const provider: Provider = providerName === "openai" ? new OpenAIProvider() : new AnthropicProvider();
     const concurrency = parseInt(opts.concurrency, 10) || 5;
-    const toStdout = opts.stdout === true || (opts.clipboard && !opts.output);
+    const toStdout = opts.stdout === true;
     const noFrontmatter = opts.frontmatter === false;
     const applyFrontmatter = (md: string) => noFrontmatter ? stripFrontmatter(md) : md;
 
+    // Provider size limits (base64 encoding adds ~33%)
+    const PROVIDER_LIMITS: Record<string, number> = {
+      anthropic: 5 * 1024 * 1024,
+      openai: 20 * 1024 * 1024,
+    };
+    const primaryLimit = PROVIDER_LIMITS[providerName] ?? Infinity;
+    const altProviderName = providerName === "anthropic" ? "openai" : "anthropic";
+    const altApiKeyEnv = altProviderName === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
+    const altAvailable = !!process.env[altApiKeyEnv];
+    const altLimit = PROVIDER_LIMITS[altProviderName] ?? Infinity;
+
     // Build unified work items: local files + URLs
-    type WorkItem = { kind: "file"; path: string } | { kind: "url"; url: string };
+    type WorkItem = {
+      kind: "file"; path: string; useAlt?: boolean;
+    } | {
+      kind: "url"; url: string; useAlt?: boolean;
+    };
     const workItems: WorkItem[] = [
       ...imagePaths.map((p): WorkItem => ({ kind: "file", path: p })),
       ...urlInputs.map((u): WorkItem => ({ kind: "url", url: u })),
     ];
 
-    const processOpts = {
-      model: opts.model,
+    // Pre-flight size check for local files
+    const oversized: { item: WorkItem; size: number; filename: string }[] = [];
+    for (const item of workItems) {
+      if (item.kind !== "file") continue;
+      const s = await stat(resolve(item.path)).catch(() => null);
+      if (s && s.size > primaryLimit) {
+        oversized.push({ item, size: s.size, filename: item.path.split("/").pop() ?? item.path });
+      }
+    }
+
+    if (oversized.length > 0) {
+      const limitMB = (primaryLimit / (1024 * 1024)).toFixed(0);
+      logger.blank();
+      logger.warn(
+        `${oversized.length} file${oversized.length > 1 ? "s" : ""} exceed${oversized.length === 1 ? "s" : ""} ` +
+        `${providerName}'s ${limitMB} MB limit:`
+      );
+      for (const { filename, size } of oversized) {
+        const sizeMB = (size / (1024 * 1024)).toFixed(1);
+        logger.info(`  ${pc.dim("•")} ${filename} ${pc.dim(`(${sizeMB} MB)`)}`);
+      }
+
+      if (altAvailable) {
+        const altLimitMB = (altLimit / (1024 * 1024)).toFixed(0);
+        const canFit = oversized.filter((o) => o.size <= altLimit);
+        const cantFit = oversized.filter((o) => o.size > altLimit);
+
+        if (canFit.length > 0) {
+          const altModel = altProviderName === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
+          logger.info(
+            `  Using ${brand(altProviderName)} (${altLimitMB} MB limit) for ${canFit.length === oversized.length ? "these" : `${canFit.length} of these`}`
+          );
+          for (const { item } of canFit) {
+            item.useAlt = true;
+          }
+        }
+        if (cantFit.length > 0) {
+          logger.warn(`  ${cantFit.length} file${cantFit.length > 1 ? "s" : ""} exceed even ${altProviderName}'s ${altLimitMB} MB limit — skipping`);
+        }
+      } else {
+        logger.info(`  Skipping — set ${brand(altApiKeyEnv)} to auto-fallback to ${altProviderName}`);
+      }
+    }
+
+    // Remove items that can't be processed by any provider
+    const skippedFiles = new Set<string>();
+    const filteredItems = workItems.filter((item) => {
+      if (item.kind !== "file") return true;
+      const ov = oversized.find((o) => o.item === item);
+      if (!ov) return true; // under limit
+      if (item.useAlt) return true; // will use alt provider
+      skippedFiles.add(ov.filename);
+      return false;
+    });
+
+    if (filteredItems.length === 0 && skippedFiles.size > 0) {
+      logger.blank();
+      logger.error("All files exceed the provider size limit.");
+      logger.blank();
+      process.exit(1);
+    }
+
+    const altProvider: Provider | undefined = filteredItems.some((i) => i.useAlt)
+      ? (altProviderName === "openai" ? new OpenAIProvider() : new AnthropicProvider())
+      : undefined;
+    const altModel = altProviderName === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
+
+    const makeProcessOpts = (item: WorkItem) => ({
+      model: item.useAlt ? altModel : opts.model,
       persona: opts.persona,
       prompt: opts.prompt,
       note: opts.note,
       template,
       templateName: opts.template,
       noCache: opts.cache === false,
-      provider,
-      providerName,
-    };
+      provider: item.useAlt && altProvider ? altProvider : provider,
+      providerName: item.useAlt ? altProviderName : providerName,
+    });
 
     if (toStdout) {
       // Stdout mode
       const results: BatchResult[] = [];
 
-      const stdoutTotal = workItems.length;
+      const stdoutTotal = filteredItems.length;
       logger.blank();
-      for (let i = 0; i < workItems.length; i++) {
-        const item = workItems[i];
+      for (let i = 0; i < filteredItems.length; i++) {
+        const item = filteredItems[i];
         const label = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : item.url;
         const prefix = stdoutTotal > 1 ? `${pc.dim(`[${i + 1}/${stdoutTotal}]`)} ` : "";
         const barLine = stdoutTotal > 1 ? `\n\n  ${logger.progressBar(i, stdoutTotal)} ${pc.dim(`${i}/${stdoutTotal}`)}` : "";
         try {
-          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${barLine}`);
+          const itemOpts = makeProcessOpts(item);
+          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${item.useAlt ? pc.dim(` (${altProviderName})`) : ""}${barLine}`);
 
           let result;
           if (item.kind === "file") {
-            result = await processFile(item.path, processOpts);
+            result = await processFile(item.path, itemOpts);
           } else {
             const fetched = await fetchUrl(item.url);
-            result = await processBuffer(fetched, processOpts);
+            result = await processBuffer(fetched, itemOpts);
           }
 
           logger.succeedSpinner(result.cached ? `${prefix}${label} ${pc.dim("(cached)")}` : `${prefix}${label}`);
           results.push({ file: label, success: true });
 
           process.stdout.write(applyFrontmatter(result.markdown));
-          if (workItems.length > 1) {
+          if (filteredItems.length > 1) {
             process.stdout.write("\n---\n\n");
           }
         } catch (err) {
@@ -325,10 +385,12 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
 
       const failed = results.filter((r) => !r.success).length;
       logger.blank();
-      if (failed > 0) process.exit(2);
+      if (failed > 0) {
+        process.exit(2);
+      }
     } else {
       // Sidecar mode (default) — sequential for clean spinner output
-      const total = workItems.length;
+      const total = filteredItems.length;
       const results: (BatchResult & { cached?: boolean })[] = [];
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
@@ -336,24 +398,25 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       const startTime = Date.now();
 
       logger.blank();
-      for (let i = 0; i < workItems.length; i++) {
-        const item = workItems[i];
+      for (let i = 0; i < filteredItems.length; i++) {
+        const item = filteredItems[i];
         const label = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : item.url;
         const filename = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : undefined;
         const prefix = total > 1 ? `${pc.dim(`[${i + 1}/${total}]`)} ` : "";
         const barLine = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
 
         try {
-          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${barLine}`);
+          const itemOpts = makeProcessOpts(item);
+          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${item.useAlt ? pc.dim(` (${altProviderName})`) : ""}${barLine}`);
 
           let result;
           let fetchedBuffer: { buffer: Buffer; filename: string } | undefined;
           if (item.kind === "file") {
-            result = await processFile(item.path, processOpts);
+            result = await processFile(item.path, itemOpts);
           } else {
             const fetched = await fetchUrl(item.url);
             fetchedBuffer = fetched;
-            result = await processBuffer(fetched, processOpts);
+            result = await processBuffer(fetched, itemOpts);
           }
 
           if (result.usage) {
@@ -367,7 +430,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
           if (item.kind === "file") {
             const outPath = opts.name
               ? formatOutputPath(item.path, opts.name as string, {
-                  date: result.metadata.processedDate ?? new Date().toISOString().split("T")[0],
+                  date: new Date().toISOString().split("T")[0],
                   type: result.type,
                   subject: result.subject,
                 }, opts.output)
@@ -439,6 +502,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       logger.blank();
       if (failed === 0) {
         const parts = [`${brand(succeeded.toString())} file${succeeded > 1 ? "s" : ""} processed`];
+        if (skippedFiles.size > 0) parts.push(`${pc.dim(`${skippedFiles.size} skipped (too large)`)}`);
         if (cachedCount > 0) parts.push(`${pc.dim(`${cachedCount} from cache`)}`);
         const modelLabel = resolvedModel ? formatModel(resolvedModel) : formatModel(opts.model);
         parts.push(pc.dim(modelLabel));
@@ -457,6 +521,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
       }
       logger.blank();
     }
+
   });
 
 // Setup subcommand
@@ -466,10 +531,14 @@ program
   .action(async () => {
     logger.header("m2md setup");
 
-    if (process.env.ANTHROPIC_API_KEY) {
-      logger.success("ANTHROPIC_API_KEY is set");
+    const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+    const hasOpenAI = !!process.env.OPENAI_API_KEY;
+    let anyValid = false;
 
-      logger.startSpinner("Verifying API key...");
+    // Check Anthropic
+    if (hasAnthropic) {
+      logger.success("ANTHROPIC_API_KEY is set");
+      logger.startSpinner("Verifying Anthropic key...");
       try {
         const { default: Anthropic } = await import("@anthropic-ai/sdk");
         const client = new Anthropic();
@@ -478,26 +547,51 @@ program
           max_tokens: 10,
           messages: [{ role: "user", content: "Hi" }],
         });
-        logger.succeedSpinner("API key is valid");
-        logger.blank();
-        process.stderr.write(`  ${pc.green("You're all set!")} Try: ${brand("m2md <image>")}\n`);
-        logger.blank();
+        logger.succeedSpinner("Anthropic key is valid");
+        anyValid = true;
       } catch {
         logger.stopSpinner();
-        logger.error("API key is invalid or expired");
-        logger.blank();
-        process.stderr.write(`  Get a new key at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
-        logger.blank();
-        process.exit(1);
+        logger.error("Anthropic key is invalid or expired");
       }
     } else {
       logger.warn("ANTHROPIC_API_KEY is not set");
+    }
+
+    // Check OpenAI
+    if (hasOpenAI) {
+      logger.success("OPENAI_API_KEY is set");
+      logger.startSpinner("Verifying OpenAI key...");
+      try {
+        const { default: OpenAI } = await import("openai");
+        const client = new OpenAI();
+        await client.chat.completions.create({
+          model: DEFAULT_OPENAI_MODEL,
+          max_tokens: 10,
+          messages: [{ role: "user", content: "Hi" }],
+        });
+        logger.succeedSpinner("OpenAI key is valid");
+        anyValid = true;
+      } catch {
+        logger.stopSpinner();
+        logger.error("OpenAI key is invalid or expired");
+      }
+    } else {
+      logger.warn("OPENAI_API_KEY is not set");
+    }
+
+    logger.blank();
+    if (anyValid) {
+      process.stderr.write(`  ${pc.green("You're all set!")} Try: ${brand("m2md <image>")}\n`);
       logger.blank();
+    } else {
       process.stderr.write(`  ${brand(pc.bold("To set up:"))}\n`);
-      process.stderr.write(`  ${pc.dim("1.")} Get a key at ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
+      process.stderr.write(`  ${pc.dim("1.")} Get a key:\n`);
+      process.stderr.write(`     Anthropic: ${brand(pc.underline("https://console.anthropic.com/settings/keys"))}\n`);
+      process.stderr.write(`     OpenAI:    ${brand(pc.underline("https://platform.openai.com/api-keys"))}\n`);
       process.stderr.write(`  ${pc.dim("2.")} Add to your shell profile ${pc.dim("(~/.zshrc or ~/.bashrc)")}:\n`);
       logger.blank();
       process.stderr.write(`     ${brand('export ANTHROPIC_API_KEY="sk-ant-..."')}\n`);
+      process.stderr.write(`     ${brand('export OPENAI_API_KEY="sk-..."')}\n`);
       logger.blank();
       process.stderr.write(`  ${pc.dim("3.")} Reload your shell: ${brand("source ~/.zshrc")}\n`);
       process.stderr.write(`  ${pc.dim("4.")} Verify: ${brand("m2md setup")}\n`);
@@ -703,35 +797,6 @@ program
     }
   });
 
-function formatCompareMarkdown(rawText: string, filenames: string[]): string {
-  const labels = filenames.map((f, i) => `- **Image ${String.fromCharCode(65 + i)}:** ${f}`);
-  const header = `# Comparison\n\n${labels.join("\n")}\n\n`;
-
-  // Parse the structured response into markdown sections
-  const sections: { key: string; heading: string }[] = [
-    { key: "SUMMARY", heading: "## Summary" },
-    { key: "SIMILARITIES", heading: "## Similarities" },
-    { key: "DIFFERENCES", heading: "## Differences" },
-    { key: "VERDICT", heading: "## Verdict" },
-  ];
-
-  let body = "";
-  for (const { key, heading } of sections) {
-    const regex = new RegExp(`${key}:\\s*\\n([\\s\\S]*?)(?=\\n(?:SUMMARY|SIMILARITIES|DIFFERENCES|VERDICT):|$)`);
-    const match = rawText.match(regex);
-    if (match) {
-      body += `${heading}\n\n${match[1].trim()}\n\n`;
-    }
-  }
-
-  // Fallback: if parsing fails, just use raw text
-  if (!body.trim()) {
-    body = rawText;
-  }
-
-  return header + body.trimEnd() + "\n";
-}
-
 async function fetchUrl(url: string): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
   try {
     return await fetchImage(url);
@@ -769,19 +834,45 @@ async function resolveFileArgs(args: string[]): Promise<string[]> {
   return args;
 }
 
+function friendlyApiMessage(msg: string): string {
+  let text = msg;
+
+  // Try to extract the nested error message from JSON API responses
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed?.error?.message) text = parsed.error.message;
+  } catch {
+    // Not JSON — check if it contains an embedded JSON body
+    const jsonMatch = text.match(/\{[\s\S]*"message"\s*:\s*"([^"]+)"/);
+    if (jsonMatch) text = jsonMatch[1];
+  }
+
+  // Strip internal API path prefixes like "messages.0.content.0.image.source.base64: "
+  text = text.replace(/^messages\.\d+\.content\.\d+\.\S+:\s*/, "");
+
+  return text;
+}
+
 function handleError(err: unknown): void {
   if (err instanceof Error) {
     const msg = err.message;
     if ("status" in err) {
       const status = (err as { status: number }).status;
+      const friendly = friendlyApiMessage(msg);
       if (status === 401) {
         logger.error("Invalid API key. Check your ANTHROPIC_API_KEY.");
       } else if (status === 400) {
-        logger.error(`API rejected the request: ${msg}`);
+        // Detect image size errors and add helpful context
+        if (/image exceeds|too large|payload too large/i.test(friendly)) {
+          logger.error(`Image too large: ${friendly}`);
+          logger.info(pc.dim("Anthropic limit is 5 MB per image. OpenAI supports up to 20 MB."));
+        } else {
+          logger.error(`API rejected the request: ${friendly}`);
+        }
       } else if (status === 403) {
-        logger.error(`Access denied: ${msg}`);
+        logger.error(`Access denied: ${friendly}`);
       } else {
-        logger.error(`API error (${status}): ${msg}`);
+        logger.error(`API error (${status}): ${friendly}`);
       }
     } else {
       logger.error(msg);

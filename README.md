@@ -63,18 +63,6 @@ m2md ./assets/ -r -o ./docs/            # recursive, custom output dir
 m2md ./assets/*.png                     # glob
 ```
 
-### Clipboard
-
-Grab an image straight from the clipboard:
-
-```bash
-m2md --clipboard                        # describe clipboard image (prints to stdout)
-m2md --clipboard -o ./docs/             # save to docs/clipboard.md
-m2md --clipboard --persona design       # clipboard + persona
-```
-
-On macOS, copy an image with Cmd+Shift+4 (screenshot to clipboard) or Cmd+C from any app. On Linux, requires `xclip`.
-
 ### Tiers
 
 Quick presets instead of picking provider + model:
@@ -114,7 +102,8 @@ m2md screenshot.png https://example.com/photo.jpg      # mix local files + URLs
 For non-image URLs, m2md takes a full-page screenshot using Playwright (optional dependency):
 
 ```bash
-npm install playwright && npx playwright install chromium
+npm install playwright
+npx playwright install chromium   # downloads the Chromium browser binary
 ```
 
 ### Watch mode
@@ -226,6 +215,11 @@ m2md cache status             # show cache stats
 m2md cache clear              # clear all cached results
 ```
 
+Cache location (in order of precedence):
+1. `M2MD_CACHE_DIR` environment variable
+2. `$XDG_CACHE_HOME/m2md` (if `XDG_CACHE_HOME` is set)
+3. `~/.cache/m2md` (default)
+
 ### Cost estimation
 
 Preview what a batch will cost before calling the API:
@@ -291,6 +285,8 @@ All options are optional — only set what you want to override:
 | `note` | Additive focus directive | none |
 | `template` | Output template | `default` |
 | `output` | Output directory for `.md` files | next to image |
+| `name` | Output filename pattern (`{filename}`, `{date}`, `{type}`, `{subject}`) | none |
+| `noFrontmatter` | Strip YAML frontmatter from output | `false` |
 | `recursive` | Scan directories recursively | `false` |
 | `cache` | Cache results by content hash | `true` |
 | `concurrency` | Max parallel API calls | `5` |
@@ -381,6 +377,15 @@ Returns the rendered markdown as text content. Shares the same cache as the CLI.
 ## Supported formats
 
 PNG, JPEG, WebP, GIF
+
+**Size limits per image:**
+
+| Provider | Max size |
+|----------|----------|
+| Anthropic | 5 MB |
+| OpenAI | 20 MB |
+
+If an image exceeds the provider's limit, use `--provider openai` for larger files or resize the image first.
 
 ## Programmatic API
 

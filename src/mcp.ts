@@ -65,14 +65,14 @@ server.tool(
   "describe_image",
   "Analyze an image file and return structured markdown with AI-generated description, extracted text, and metadata",
   {
-    filePath: z.string().describe("Absolute path to the image file"),
-    provider: z.enum(["anthropic", "openai"]).optional().describe("AI provider (default: anthropic)"),
-    model: z.string().optional().describe("AI model to use"),
-    persona: z.string().optional().describe("Persona: brand, design, developer, accessibility, marketing"),
-    prompt: z.string().optional().describe("Custom prompt (overrides persona)"),
-    note: z.string().optional().describe("Focus directive — additional aspects to note"),
-    template: z.string().optional().describe("Template: default, minimal, alt-text, detailed"),
-    noFrontmatter: z.boolean().optional().describe("Strip YAML frontmatter from output"),
+    filePath: z.string().describe("Absolute path to the image file. Example: /Users/me/screenshots/dashboard.png. Supported formats: PNG, JPEG, WebP, GIF."),
+    provider: z.enum(["anthropic", "openai"]).optional().describe("AI provider to use. 'anthropic' uses Claude (default, best quality), 'openai' uses GPT-4o (faster, cheaper)."),
+    model: z.string().optional().describe("AI model ID. Examples: 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gpt-4o-mini'. Defaults to provider's best model."),
+    persona: z.string().optional().describe("Built-in analysis lens. Options: 'brand' (positioning, identity), 'design' (UI/UX, spacing, typography), 'developer' (components, architecture), 'accessibility' (alt text, contrast, ARIA), 'marketing' (CTAs, conversion)."),
+    prompt: z.string().optional().describe("Custom system prompt that replaces the persona. Use for specialized analysis, e.g. 'describe from a security auditor perspective'."),
+    note: z.string().optional().describe("Additive focus directive layered on top of the active prompt. Example: 'pay attention to color contrast and font sizes'. Unlike prompt, this doesn't replace the persona."),
+    template: z.string().optional().describe("Output template. Built-in: 'default' (frontmatter + full description), 'minimal' (description + source link), 'alt-text' (description only), 'detailed' (metadata table + image embed). Or an absolute path to a custom .md template file."),
+    noFrontmatter: z.boolean().optional().describe("When true, strips the YAML frontmatter block from the output, returning only the markdown body."),
   },
   async ({ filePath, provider: providerName, model, persona, prompt, note, template: templateName, noFrontmatter }) => {
     try {

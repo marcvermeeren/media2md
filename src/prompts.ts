@@ -102,3 +102,32 @@ export function buildCompareUserPrompt(filenames: string[]): string {
   const labels = filenames.map((f, i) => `Image ${String.fromCharCode(65 + i)}: ${f}`);
   return `Compare these ${filenames.length} images:\n${labels.join("\n")}\n\nRespond with SUMMARY:, SIMILARITIES:, DIFFERENCES:, and VERDICT: sections as specified.`;
 }
+
+export function formatCompareMarkdown(rawText: string, filenames: string[]): string {
+  const labels = filenames.map((f, i) => `- **Image ${String.fromCharCode(65 + i)}:** ${f}`);
+  const header = `# Comparison\n\n${labels.join("\n")}\n\n`;
+
+  // Parse the structured response into markdown sections
+  const sections: { key: string; heading: string }[] = [
+    { key: "SUMMARY", heading: "## Summary" },
+    { key: "SIMILARITIES", heading: "## Similarities" },
+    { key: "DIFFERENCES", heading: "## Differences" },
+    { key: "VERDICT", heading: "## Verdict" },
+  ];
+
+  let body = "";
+  for (const { key, heading } of sections) {
+    const regex = new RegExp(`${key}:\\s*\\n([\\s\\S]*?)(?=\\n(?:SUMMARY|SIMILARITIES|DIFFERENCES|VERDICT):|$)`);
+    const match = rawText.match(regex);
+    if (match) {
+      body += `${heading}\n\n${match[1].trim()}\n\n`;
+    }
+  }
+
+  // Fallback: if parsing fails, just use raw text
+  if (!body.trim()) {
+    body = rawText;
+  }
+
+  return header + body.trimEnd() + "\n";
+}

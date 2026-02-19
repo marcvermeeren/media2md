@@ -33,8 +33,8 @@ export function formatOutputPath(
   let name = pattern
     .replace(/\{filename\}/g, base)
     .replace(/\{date\}/g, date)
-    .replace(/\{type\}/g, slugify(vars.type ?? "image"))
-    .replace(/\{subject\}/g, slugify(vars.subject ?? base));
+    .replace(/\{type\}/g, slugify(vars.type || "image"))
+    .replace(/\{subject\}/g, slugify(vars.subject || base));
 
   if (!name.endsWith(".md")) name += ".md";
 

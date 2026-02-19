@@ -113,4 +113,27 @@ describe("formatOutputPath", () => {
       })
     ).toBe("/photos/2026-02-18-photo-shot.md");
   });
+
+  it("slugifies special characters in subject", () => {
+    expect(
+      formatOutputPath("/photos/shot.png", "{subject}", {
+        subject: "Hello, World! (2026) — Dashboard & Charts",
+      })
+    ).toBe("/photos/hello-world-2026-dashboard-charts.md");
+  });
+
+  it("uses fallback for empty type and subject", () => {
+    expect(
+      formatOutputPath("/photos/shot.png", "{type}-{subject}", {
+        type: "",
+        subject: "",
+      })
+    ).toBe("/photos/image-shot.md");
+  });
+
+  it("handles pattern with no placeholders", () => {
+    expect(
+      formatOutputPath("/photos/shot.png", "output", {})
+    ).toBe("/photos/output.md");
+  });
 });

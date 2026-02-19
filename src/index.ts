@@ -5,7 +5,7 @@ export { parseResponse, type ParsedResponse } from "./parser.js";
 export { renderTemplate, stripFrontmatter } from "./templates/engine.js";
 export { DEFAULT_TEMPLATE, MINIMAL_TEMPLATE, ALT_TEXT_TEMPLATE, DETAILED_TEMPLATE, BUILTIN_TEMPLATES } from "./templates/builtins.js";
 export { loadTemplate } from "./templates/loader.js";
-export { buildSystemPrompt, buildUserPrompt, buildCompareSystemPrompt, buildCompareUserPrompt } from "./prompts.js";
+export { buildSystemPrompt, buildUserPrompt, buildCompareSystemPrompt, buildCompareUserPrompt, formatCompareMarkdown } from "./prompts.js";
 export { BUILTIN_PERSONAS, getPersonaNames, type Persona } from "./personas/builtins.js";
 export { discoverImages, runBatch, type DiscoverOptions, type BatchResult } from "./batch.js";
 export { sidecarPath, formatOutputPath, writeMarkdown, type WriteOptions } from "./output/writer.js";
@@ -13,7 +13,6 @@ export { buildCacheKey, getCached, setCached, clearCache, getCacheStats, type Ca
 export { loadConfig, mergeOptions, resolveTier, TIER_MAP, type M2mdConfig } from "./config.js";
 export { startWatch, type WatchOptions } from "./watch.js";
 export { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel, type CostEstimate } from "./cost.js";
-export { readClipboardImage } from "./clipboard.js";
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 export { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
 export type { Provider, ImageInput, AnalyzeOptions, ProviderResponse } from "./providers/types.js";
