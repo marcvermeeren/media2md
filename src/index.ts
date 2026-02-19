@@ -13,6 +13,7 @@ export { buildCacheKey, getCached, setCached, clearCache, getCacheStats, type Ca
 export { loadConfig, mergeOptions, resolveTier, TIER_MAP, type M2mdConfig } from "./config.js";
 export { startWatch, type WatchOptions } from "./watch.js";
 export { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel, type CostEstimate } from "./cost.js";
+export { readClipboardImage } from "./clipboard.js";
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from "./providers/anthropic.js";
 export { OpenAIProvider, DEFAULT_OPENAI_MODEL } from "./providers/openai.js";
 export type { Provider, ImageInput, AnalyzeOptions, ProviderResponse } from "./providers/types.js";

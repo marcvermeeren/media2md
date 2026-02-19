@@ -37,6 +37,7 @@
 - [x] `--no-frontmatter` — strip YAML frontmatter from output
 - [x] `--name <pattern>` — custom output filename patterns (`{filename}`, `{date}`, `{type}`, `{subject}`)
 - [x] `m2md compare` — compare two or more images side by side
+- [x] `--clipboard` — grab image from system clipboard (macOS + Linux)
 - [x] `--concurrency <n>` — max concurrent API calls
 - [x] Smart spaces-in-filename handling (unquoted args joined automatically)
 - [x] Friendly onboarding when API key is missing
@@ -109,7 +110,7 @@
 2. ~~**`--no-frontmatter` flag**~~ ✅
 3. ~~**Custom filename patterns**~~ ✅
 4. ~~**Comparison mode**~~ ✅
-5. **Clipboard support** — `m2md --clipboard` grab screenshot from clipboard
+5. ~~**Clipboard support**~~ ✅
 6. **PDF support** — extract pages, describe content
 7. **SVG / HEIC / TIFF support** — rasterize/convert then process
 8. **Audio support** — transcript + summary

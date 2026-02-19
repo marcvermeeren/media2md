@@ -63,6 +63,18 @@ m2md ./assets/ -r -o ./docs/            # recursive, custom output dir
 m2md ./assets/*.png                     # glob
 ```
 
+### Clipboard
+
+Grab an image straight from the clipboard:
+
+```bash
+m2md --clipboard                        # describe clipboard image (prints to stdout)
+m2md --clipboard -o ./docs/             # save to docs/clipboard.md
+m2md --clipboard --persona design       # clipboard + persona
+```
+
+On macOS, copy an image with Cmd+Shift+4 (screenshot to clipboard) or Cmd+C from any app. On Linux, requires `xclip`.
+
 ### Tiers
 
 Quick presets instead of picking provider + model:

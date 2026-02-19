@@ -18,6 +18,7 @@ import { extractMetadata, mimeTypeFromExtension } from "./extractors/metadata.js
 import { estimateCost, estimateImageTokens, formatCost, calculateCost, formatModel } from "./cost.js";
 import { isUrl, fetchImage, screenshotPage, ContentTypeError } from "./url.js";
 import { buildCompareSystemPrompt, buildCompareUserPrompt } from "./prompts.js";
+import { readClipboardImage } from "./clipboard.js";
 import * as logger from "./utils/logger.js";
 import { brand, accent } from "./utils/logger.js";
 
@@ -32,7 +33,8 @@ program
     outputError: (str) => process.stderr.write(str),
   })
   .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.1.0")}\n`)
-  .argument("<files...>", "Image file(s) or directory to process")
+  .argument("[files...]", "Image file(s) or directory to process")
+  .option("--clipboard", "Grab image from system clipboard")
   .option("--provider <provider>", "AI provider: anthropic, openai")
   .option("-m, --model <model>", "AI model to use")
   .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
@@ -65,6 +67,8 @@ ${brand(pc.bold("Examples:"))}
   ${pc.dim("$")} m2md photo.jpg --provider openai         ${pc.dim("# use OpenAI GPT-4o")}
   ${pc.dim("$")} m2md photo.jpg --tier fast              ${pc.dim("# quick + cheap (gpt-4o-mini)")}
   ${pc.dim("$")} m2md photo.jpg --tier quality           ${pc.dim("# best results (claude-sonnet)")}
+  ${pc.dim("$")} m2md --clipboard                         ${pc.dim("# describe image from clipboard")}
+  ${pc.dim("$")} m2md --clipboard -o ./docs/              ${pc.dim("# clipboard → file in docs/")}
 
 ${brand(pc.bold("Personas:"))} ${getPersonaNames().map((n) => accent(n)).join(pc.dim(", "))}
 
@@ -106,6 +110,32 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
     const defaultModel = providerName === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
     if (!opts.model) {
       opts.model = defaultModel;
+    }
+
+    // Handle --clipboard: read image from clipboard into a temp file
+    if (opts.clipboard) {
+      if (files.length > 0) {
+        logger.blank();
+        logger.error("Cannot use --clipboard with file arguments.");
+        logger.blank();
+        process.exit(1);
+      }
+      try {
+        const clipPath = await readClipboardImage();
+        files = [clipPath];
+      } catch (err) {
+        logger.blank();
+        logger.error((err as Error).message);
+        logger.blank();
+        process.exit(1);
+      }
+    }
+
+    if (files.length === 0) {
+      logger.blank();
+      logger.error("No input specified. Provide image files or use --clipboard.");
+      logger.blank();
+      process.exit(1);
     }
 
     // Try joining args as a single path if individual files aren't found
@@ -233,7 +263,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
 
     const provider: Provider = providerName === "openai" ? new OpenAIProvider() : new AnthropicProvider();
     const concurrency = parseInt(opts.concurrency, 10) || 5;
-    const toStdout = opts.stdout === true;
+    const toStdout = opts.stdout === true || (opts.clipboard && !opts.output);
     const noFrontmatter = opts.frontmatter === false;
     const applyFrontmatter = (md: string) => noFrontmatter ? stripFrontmatter(md) : md;
 
