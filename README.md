@@ -7,7 +7,7 @@ I have 20 years of visual references (design inspiration, screenshots, diagrams,
 m2md fixes that. One command turns any image into a structured `.md` sidecar with AI-generated descriptions, extracted text, typed metadata, and tags. Ready for full-text search, vector search, and LLM retrieval.
 
 ```bash
-npm install -g m2md
+npm install -g media2md
 ```
 
 ## Quick start
@@ -283,7 +283,7 @@ You can also put config under an `"m2md"` key in `package.json`.
 
 ```bash
 # 1. Install
-npm install -g m2md
+npm install -g media2md
 
 # 2. Set your API key (one or both)
 export ANTHROPIC_API_KEY="sk-ant-..."   # for Anthropic / --tier quality (default)
@@ -357,7 +357,7 @@ If both API keys are set, m2md automatically routes oversized files to the other
 ## Programmatic API
 
 ```typescript
-import { processFile, AnthropicProvider } from "m2md";
+import { processFile, AnthropicProvider } from "media2md";
 
 const result = await processFile("screenshot.png", {
   provider: new AnthropicProvider(),

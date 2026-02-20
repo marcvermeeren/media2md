@@ -1,17 +1,17 @@
 {
-  "name": "m2md",
+  "name": "media2md",
   "version": "0.1.0",
   "description": "Convert images to structured markdown with AI-generated descriptions and extracted text",
   "author": "Marc Vermeeren",
   "repository": {
     "type": "git",
-    "url": "https://github.com/marcvermeeren/m2md.git"
+    "url": "git+https://github.com/marcvermeeren/media2md.git"
   },
-  "homepage": "https://github.com/marcvermeeren/m2md",
+  "homepage": "https://github.com/marcvermeeren/media2md",
   "type": "module",
   "bin": {
-    "m2md": "./dist/cli.js",
-    "m2md-mcp": "./dist/mcp.js"
+    "m2md": "dist/cli.js",
+    "m2md-mcp": "dist/mcp.js"
   },
   "exports": {
     ".": {
