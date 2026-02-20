@@ -1,58 +1,116 @@
-import ora, { type Ora } from "ora";
 import pc from "picocolors";
 
 const isTTY = process.stderr.isTTY ?? false;
 
-let spinner: Ora | null = null;
-
 // Brand color — consistent cyan accent
 const brand = pc.cyan;
 const accent = pc.magenta;
+
+// ── Custom spinner ─────────────────────────────────────────────────
+// On resize, terminals reflow the active line across multiple rows.
+// \r only goes to col 0 of the bottom row, leaving ghost text above.
+// Fix: track written length, cursor-up to the top of the reflowed
+// region, then erase from there to end of screen.
+
+const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const INTERVAL = 80;
+
+let spinnerText = "";
+let spinnerFrame = 0;
+let spinnerTimer: ReturnType<typeof setInterval> | null = null;
+let prevWrittenLen = 0;
+
+process.on("SIGINT", () => {
+  if (spinnerTimer) {
+    clearInterval(spinnerTimer);
+    spinnerTimer = null;
+    clearSpinnerLine();
+  }
+  process.exit(130);
+});
+
+// Truncate a string containing ANSI codes to a visible width
+function truncateAnsi(str: string, maxWidth: number): string {
+  if (maxWidth <= 0) return "";
+  let visible = 0;
+  let i = 0;
+  while (i < str.length && visible < maxWidth) {
+    if (str[i] === "\x1b") {
+      const end = str.indexOf("m", i);
+      if (end !== -1) { i = end + 1; continue; }
+    }
+    visible++;
+    i++;
+  }
+  if (i >= str.length) return str;
+  return str.slice(0, i) + "\x1b[0m";
+}
+
+function clearSpinnerLine(): void {
+  const cols = process.stderr.columns || 80;
+  const lines = prevWrittenLen > 0 ? Math.ceil(prevWrittenLen / cols) : 1;
+  if (lines > 1) {
+    process.stderr.write(`\x1b[${lines - 1}A`);
+  }
+  process.stderr.write(`\r\x1b[J`);
+  prevWrittenLen = 0;
+}
+
+function renderSpinner(): void {
+  const frame = pc.cyan(FRAMES[spinnerFrame % FRAMES.length]);
+  const cols = process.stderr.columns || 80;
+  const line = `  ${frame} ${spinnerText}`;
+  const output = truncateAnsi(line, cols - 1);
+
+  if (spinnerFrame > 0) clearSpinnerLine();
+
+  process.stderr.write(output);
+  prevWrittenLen = stripAnsi(output).length;
+  spinnerFrame++;
+}
+
+// Re-render immediately on resize (don't wait for next 80ms tick)
+if (isTTY) {
+  process.stderr.on("resize", () => {
+    if (spinnerTimer) renderSpinner();
+  });
+}
 
 export function startSpinner(text: string): void {
   if (!isTTY) {
     process.stderr.write(pc.dim(`  ${text}\n`));
     return;
   }
-  spinner = ora({
-    text,
-    stream: process.stderr,
-    spinner: "dots",
-    color: "cyan",
-    indent: 2,
-  }).start();
+  spinnerText = text;
+  spinnerFrame = 0;
+  prevWrittenLen = 0;
+  renderSpinner();
+  spinnerTimer = setInterval(renderSpinner, INTERVAL);
 }
 
 export function updateSpinner(text: string): void {
-  if (spinner) {
-    spinner.text = text;
+  if (spinnerTimer) {
+    spinnerText = text;
   } else if (!isTTY) {
     process.stderr.write(pc.dim(`  ${text}\n`));
   }
 }
 
 export function stopSpinner(): void {
-  if (spinner) {
-    spinner.stop();
-    spinner = null;
+  if (spinnerTimer) {
+    clearInterval(spinnerTimer);
+    spinnerTimer = null;
+    clearSpinnerLine();
   }
 }
 
 export function succeedSpinner(text: string): void {
-  if (spinner) {
-    spinner.stop();
-    spinner = null;
+  if (spinnerTimer) {
+    clearInterval(spinnerTimer);
+    spinnerTimer = null;
+    clearSpinnerLine();
   }
-  // Prefix: 2-space indent + ✓ + space = matches ora indent:2 + spinner char + space
   process.stderr.write(`  ${pc.green("✓")} ${text}\n`);
-}
-
-export function failSpinner(text: string): void {
-  if (spinner) {
-    spinner.stop();
-    spinner = null;
-  }
-  process.stderr.write(`  ${pc.red("✗")} ${text}\n`);
 }
 
 export function success(msg: string): void {
@@ -93,12 +151,6 @@ export function summary(lines: string[]): void {
 // Strip ANSI escape codes for length calculation
 export function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "");
-}
-
-export function progressBar(current: number, total: number, width = 20): string {
-  const filled = Math.round((current / total) * width);
-  const empty = width - filled;
-  return `${pc.cyan("█".repeat(filled))}${pc.dim("░".repeat(empty))}`;
 }
 
 interface TableColumn {

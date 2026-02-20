@@ -44,7 +44,6 @@
     "cosmiconfig": "^9.0.0",
     "image-size": "^2.0.1",
     "openai": "^6.22.0",
-    "ora": "^8.1.1",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {

@@ -68,13 +68,12 @@ server.tool(
     filePath: z.string().describe("Absolute path to the image file. Example: /Users/me/screenshots/dashboard.png. Supported formats: PNG, JPEG, WebP, GIF."),
     provider: z.enum(["anthropic", "openai"]).optional().describe("AI provider to use. 'anthropic' uses Claude (default, best quality), 'openai' uses GPT-4o (faster, cheaper)."),
     model: z.string().optional().describe("AI model ID. Examples: 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gpt-4o-mini'. Defaults to provider's best model."),
-    persona: z.string().optional().describe("Built-in analysis lens. Options: 'brand' (positioning, identity), 'design' (UI/UX, spacing, typography), 'developer' (components, architecture), 'accessibility' (alt text, contrast, ARIA), 'marketing' (CTAs, conversion)."),
-    prompt: z.string().optional().describe("Custom system prompt that replaces the persona. Use for specialized analysis, e.g. 'describe from a security auditor perspective'."),
-    note: z.string().optional().describe("Additive focus directive layered on top of the active prompt. Example: 'pay attention to color contrast and font sizes'. Unlike prompt, this doesn't replace the persona."),
+    prompt: z.string().optional().describe("Custom instructions appended to the system prompt. Use for specialized analysis, e.g. 'List all visible product names and prices'."),
+    note: z.string().optional().describe("Focus directive layered on top of the analysis. Example: 'pay attention to color contrast and font sizes'."),
     template: z.string().optional().describe("Output template. Built-in: 'default' (frontmatter + full description), 'minimal' (description + source link), 'alt-text' (description only), 'detailed' (metadata table + image embed). Or an absolute path to a custom .md template file."),
     noFrontmatter: z.boolean().optional().describe("When true, strips the YAML frontmatter block from the output, returning only the markdown body."),
   },
-  async ({ filePath, provider: providerName, model, persona, prompt, note, template: templateName, noFrontmatter }) => {
+  async ({ filePath, provider: providerName, model, prompt, note, template: templateName, noFrontmatter }) => {
     try {
       const name = providerName ?? "anthropic";
       const defaultModel = name === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
@@ -95,7 +94,6 @@ server.tool(
 
       const result = await processFile(filePath, {
         model: resolvedModel,
-        persona,
         prompt,
         note,
         template,

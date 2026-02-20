@@ -10,7 +10,6 @@ import type { Provider } from "./providers/types.js";
 import { getSupportedFormats } from "./extractors/metadata.js";
 import { loadTemplate } from "./templates/loader.js";
 import { stripFrontmatter } from "./templates/engine.js";
-import { getPersonaNames } from "./personas/builtins.js";
 import { discoverImages, runBatch, type BatchResult } from "./batch.js";
 import { sidecarPath, formatOutputPath, writeMarkdown } from "./output/writer.js";
 import { clearCache, getCacheStats, buildCacheKey, getCached } from "./cache/store.js";
@@ -36,8 +35,7 @@ program
 .option("--provider <provider>", "AI provider: anthropic, openai")
   .option("-m, --model <model>", "AI model to use")
   .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
-  .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
-  .option("--prompt <prompt>", "Custom prompt (overrides persona)")
+  .option("-p, --prompt <prompt>", "Custom instructions for the model")
   .option("-n, --note <note>", "Focus directive — additional aspects for the LLM to note")
   .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
   .option("-o, --output <dir>", "Output directory for .md files (default: next to image)")
@@ -60,13 +58,11 @@ ${brand(pc.bold("Examples:"))}
   ${pc.dim("$")} m2md screenshot.png --stdout | pbcopy     ${pc.dim("# copy to clipboard")}
   ${pc.dim("$")} m2md ./assets/                           ${pc.dim("# batch, .md next to each image")}
   ${pc.dim("$")} m2md ./assets/ -r -o ./docs/             ${pc.dim("# recursive, output dir")}
-  ${pc.dim("$")} m2md photo.jpg --persona brand           ${pc.dim("# brand analyst lens")}
   ${pc.dim("$")} m2md diagram.png --template minimal      ${pc.dim("# minimal output")}
+  ${pc.dim("$")} m2md photo.jpg -p "List all products"   ${pc.dim("# custom instructions")}
   ${pc.dim("$")} m2md photo.jpg --provider openai         ${pc.dim("# use OpenAI GPT-4o")}
   ${pc.dim("$")} m2md photo.jpg --tier fast              ${pc.dim("# quick + cheap (gpt-4o-mini)")}
   ${pc.dim("$")} m2md photo.jpg --tier quality           ${pc.dim("# best results (claude-sonnet)")}
-
-${brand(pc.bold("Personas:"))} ${getPersonaNames().map((n) => accent(n)).join(pc.dim(", "))}
 
 ${brand(pc.bold("Templates:"))} ${["default", "minimal", "alt-text", "detailed"].map((n) => accent(n)).join(pc.dim(", "))}${pc.dim(", or path to .md file")}
 
@@ -143,7 +139,6 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
         const { metadata } = await extractMetadata(filePath);
         const key = buildCacheKey(metadata.sha256, {
           model: opts.model,
-          persona: opts.persona,
           prompt: opts.prompt,
           templateName: opts.template,
           note: opts.note,
@@ -335,7 +330,6 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
 
     const makeProcessOpts = (item: WorkItem) => ({
       model: item.useAlt ? altModel : opts.model,
-      persona: opts.persona,
       prompt: opts.prompt,
       note: opts.note,
       template,
@@ -355,10 +349,9 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
         const item = filteredItems[i];
         const label = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : item.url;
         const prefix = stdoutTotal > 1 ? `${pc.dim(`[${i + 1}/${stdoutTotal}]`)} ` : "";
-        const barLine = stdoutTotal > 1 ? `\n\n  ${logger.progressBar(i, stdoutTotal)} ${pc.dim(`${i}/${stdoutTotal}`)}` : "";
         try {
           const itemOpts = makeProcessOpts(item);
-          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${item.useAlt ? pc.dim(` (${altProviderName})`) : ""}${barLine}`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${item.useAlt ? pc.dim(` (${altProviderName})`) : ""}`);
 
           let result;
           if (item.kind === "file") {
@@ -403,11 +396,11 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
         const label = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : item.url;
         const filename = item.kind === "file" ? (item.path.split("/").pop() ?? item.path) : undefined;
         const prefix = total > 1 ? `${pc.dim(`[${i + 1}/${total}]`)} ` : "";
-        const barLine = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
+        // Progress is shown by the [i/total] prefix — no inline bar needed
 
         try {
           const itemOpts = makeProcessOpts(item);
-          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${item.useAlt ? pc.dim(` (${altProviderName})`) : ""}${barLine}`);
+          logger.startSpinner(`${prefix}Analyzing ${accent(label)}${item.useAlt ? pc.dim(` (${altProviderName})`) : ""}`);
 
           let result;
           let fetchedBuffer: { buffer: Buffer; filename: string } | undefined;
@@ -436,8 +429,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
                 }, opts.output)
               : sidecarPath(item.path, opts.output);
             if (!result.cached) {
-              const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
-              logger.updateSpinner(`${prefix}Writing ${accent(filename!)}${writeBar}`);
+              logger.updateSpinner(`${prefix}Writing ${accent(filename!)}`);
             }
             await writeMarkdown(applyFrontmatter(result.markdown), outPath);
             results.push({ file: item.path, success: true, outputPath: outPath, cached: result.cached });
@@ -467,8 +459,7 @@ ${brand(pc.bold("Supported formats:"))} ${getSupportedFormats().map((f) => pc.di
             }
 
             if (!result.cached) {
-              const writeBar = total > 1 ? `\n\n  ${logger.progressBar(i, total)} ${pc.dim(`${i}/${total}`)}` : "";
-              logger.updateSpinner(`${prefix}Writing ${accent(outName)}${writeBar}`);
+              logger.updateSpinner(`${prefix}Writing ${accent(outName)}`);
             }
             await writeMarkdown(applyFrontmatter(result.markdown), outPath);
             results.push({ file: item.url, success: true, outputPath: outPath, cached: result.cached });
@@ -638,8 +629,7 @@ program
   .option("--provider <provider>", "AI provider: anthropic, openai")
   .option("-m, --model <model>", "AI model to use")
   .option("--tier <tier>", "Preset tier: fast (gpt-4o-mini), quality (claude-sonnet)")
-  .option("-p, --persona <persona>", `Persona: ${getPersonaNames().join(", ")}`)
-  .option("--prompt <prompt>", "Custom prompt (overrides persona)")
+  .option("-p, --prompt <prompt>", "Custom instructions for the model")
   .option("-n, --note <note>", "Focus directive")
   .option("-t, --template <template>", "Template: default, minimal, alt-text, detailed, or path")
   .option("-o, --output <dir>", "Output directory for .md files")
@@ -685,7 +675,6 @@ program
       provider,
       providerName,
       model: opts.model as string,
-      persona: opts.persona as string | undefined,
       prompt: opts.prompt as string | undefined,
       note: opts.note as string | undefined,
       template: opts.template as string | undefined,

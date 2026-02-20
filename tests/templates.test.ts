@@ -13,9 +13,15 @@ import { loadTemplate } from "../src/templates/loader.js";
 
 const sampleVars: Record<string, string> = {
   type: "screenshot",
+  category: "ui-design",
+  style: "minimalist, flat, corporate",
+  mood: "calm, modern",
+  medium: "screen-capture",
+  composition: "centered, grid",
+  palette: "dark-blue, white, light-gray",
   subject: "Dashboard with analytics charts",
-  colors: "dark blue, white, light gray",
-  tags: "dashboard, chart, analytics, navigation, sidebar",
+  colors: "dark-blue, white, light-gray",
+  tags: "dashboard-chart, analytics-panel, navigation-sidebar",
   filename: "test.png",
   basename: "test",
   format: "PNG",
@@ -28,26 +34,37 @@ const sampleVars: Record<string, string> = {
   processedDate: "2026-02-17",
   datetime: "2026-02-17T12:00:00.000Z",
   model: "claude-sonnet-4-5-20250929",
-  persona: "brand",
   sourcePath: "./test.png",
-  description: "## Layout\n- A dashboard with two chart panels\n\n## Content\n- Line chart showing revenue\n- Bar chart showing users",
+  description: "- A dashboard with two chart panels\n- Line chart showing revenue\n- Bar chart showing users",
   extractedText: "**Navigation:** Dashboard | Settings | Logout\n**Chart Title:** Monthly Revenue",
 };
 
 describe("built-in templates", () => {
-  it("default template includes type, subject, colors, and tags in frontmatter", () => {
+  it("default template includes new structured fields in frontmatter", () => {
     const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
     expect(result).toContain("---");
     expect(result).toContain("type: screenshot");
+    expect(result).toContain("category: [ui-design]");
+    expect(result).toContain("style: [minimalist, flat, corporate]");
+    expect(result).toContain("mood: [calm, modern]");
+    expect(result).toContain("medium: screen-capture");
+    expect(result).toContain("composition: [centered, grid]");
+    expect(result).toContain("palette: [dark-blue, white, light-gray]");
     expect(result).toContain('subject: "Dashboard with analytics charts"');
-    expect(result).toContain("colors: [dark blue, white, light gray]");
-    expect(result).toContain("tags: [dashboard, chart, analytics, navigation, sidebar]");
+    expect(result).toContain("tags: [dashboard-chart, analytics-panel, navigation-sidebar]");
     expect(result).toContain("source: test.png");
-    expect(result).toContain("Dashboard with analytics charts");
-    expect(result).toContain("## Layout");
-    expect(result).toContain("## Extracted Text");
+  });
+
+  it("default template renders flat bullet-point description", () => {
+    const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
+    expect(result).toContain("- A dashboard with two chart panels");
+    expect(result).toContain("- Line chart showing revenue");
+  });
+
+  it("default template uses ## Text heading for extracted text", () => {
+    const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
+    expect(result).toContain("## Text");
     expect(result).toContain("**Navigation:**");
-    expect(result).toContain("persona: brand");
   });
 
   it("default template does not include sha256, format, size, or # heading", () => {
@@ -63,30 +80,43 @@ describe("built-in templates", () => {
   it("default template omits extracted text when empty", () => {
     const vars = { ...sampleVars, extractedText: "" };
     const result = renderTemplate(DEFAULT_TEMPLATE, vars);
-    expect(result).not.toContain("## Extracted Text");
+    expect(result).not.toContain("## Text");
   });
 
-  it("default template omits persona when empty", () => {
-    const vars = { ...sampleVars, persona: "" };
+  it("default template omits new fields when empty (backward compat)", () => {
+    const vars = {
+      ...sampleVars,
+      category: "",
+      style: "",
+      mood: "",
+      medium: "",
+      composition: "",
+      palette: "",
+    };
     const result = renderTemplate(DEFAULT_TEMPLATE, vars);
-    expect(result).not.toContain("persona:");
+    expect(result).not.toContain("category:");
+    expect(result).not.toContain("style:");
+    expect(result).not.toContain("mood:");
+    expect(result).not.toContain("medium:");
+    expect(result).not.toContain("composition:");
+    expect(result).not.toContain("palette:");
   });
 
   it("minimal template is just description + source link", () => {
     const result = renderTemplate(MINIMAL_TEMPLATE, sampleVars);
-    expect(result).toContain("## Layout");
+    expect(result).toContain("- A dashboard with two chart panels");
     expect(result).toContain("Source: [test.png](./test.png)");
     expect(result).not.toContain("---");
   });
 
   it("alt-text template is just description", () => {
     const result = renderTemplate(ALT_TEXT_TEMPLATE, sampleVars);
-    expect(result).toContain("## Layout");
+    expect(result).toContain("- A dashboard with two chart panels");
     expect(result).not.toContain("---");
     expect(result).not.toContain("Source:");
   });
 
-  it("detailed template includes metadata table, sha256, colors, and tags", () => {
+  it("detailed template includes new fields, metadata table, and sha256", () => {
     const result = renderTemplate(DETAILED_TEMPLATE, sampleVars);
     expect(result).toContain("| Property | Value |");
     expect(result).toContain("| File | test.png |");
@@ -94,9 +124,11 @@ describe("built-in templates", () => {
     expect(result).toContain("sizeBytes: 43110");
     expect(result).toContain("sha256: abc123def456");
     expect(result).toContain("type: screenshot");
+    expect(result).toContain("category: [ui-design]");
+    expect(result).toContain("style: [minimalist, flat, corporate]");
     expect(result).toContain('subject: "Dashboard with analytics charts"');
-    expect(result).toContain("colors: [dark blue, white, light gray]");
-    expect(result).toContain("tags: [dashboard, chart, analytics, navigation, sidebar]");
+    expect(result).toContain("colors: [dark-blue, white, light-gray]");
+    expect(result).toContain("tags: [dashboard-chart, analytics-panel, navigation-sidebar]");
     expect(result).toContain("# test");
     expect(result).toContain("![test](./test.png)");
   });
@@ -142,8 +174,7 @@ describe("stripFrontmatter", () => {
     const stripped = stripFrontmatter(rendered);
     expect(stripped).not.toContain("type: screenshot");
     expect(stripped).not.toMatch(/^---/);
-    expect(stripped).toContain("Dashboard with analytics charts");
-    expect(stripped).toContain("## Layout");
+    expect(stripped).toContain("- A dashboard with two chart panels");
   });
 });
 

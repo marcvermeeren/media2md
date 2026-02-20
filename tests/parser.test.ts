@@ -1,28 +1,41 @@
 import { describe, it, expect } from "vitest";
 import { parseResponse } from "../src/parser.js";
 
-describe("parseResponse — new six-section format", () => {
-  it("parses well-formatted six-section response", () => {
+describe("parseResponse — new retrieval-optimized format", () => {
+  it("parses well-formatted response with all new fields", () => {
     const raw = `TYPE:
 screenshot
+
+CATEGORY:
+ui-design
+
+STYLE:
+minimalist, flat, corporate
+
+MOOD:
+calm, modern
+
+MEDIUM:
+screen-capture
+
+COMPOSITION:
+centered, grid
+
+PALETTE:
+dark-blue, white, light-gray
 
 SUBJECT:
 Login form with email and password fields
 
-COLORS:
-white, blue, light gray
-
 TAGS:
-login, form, email, password, button, authentication
+login-form, email-input, password-field, sign-in-button, authentication
 
 DESCRIPTION:
-## Layout
 - Centered card with two input fields and a submit button
-
-## Content
-- Email field with placeholder
-- Password field with toggle visibility
-- "Sign In" primary button
+- Email field with placeholder text
+- Password field with toggle visibility icon
+- "Sign In" primary button in blue
+- Light gray background with subtle shadow on card
 
 EXTRACTED_TEXT:
 **Form Labels:** Email | Password
@@ -31,14 +44,58 @@ EXTRACTED_TEXT:
 
     const result = parseResponse(raw);
     expect(result.type).toBe("screenshot");
+    expect(result.category).toBe("ui-design");
+    expect(result.style).toBe("minimalist, flat, corporate");
+    expect(result.mood).toBe("calm, modern");
+    expect(result.medium).toBe("screen-capture");
+    expect(result.composition).toBe("centered, grid");
+    expect(result.palette).toBe("dark-blue, white, light-gray");
     expect(result.subject).toBe("Login form with email and password fields");
-    expect(result.colors).toBe("white, blue, light gray");
-    expect(result.tags).toBe("login, form, email, password, button, authentication");
-    expect(result.description).toContain("## Layout");
-    expect(result.description).toContain("## Content");
+    expect(result.tags).toBe("login-form, email-input, password-field, sign-in-button, authentication");
     expect(result.description).toContain("Centered card");
+    expect(result.description).toContain("primary button in blue");
     expect(result.extractedText).toContain("**Form Labels:**");
     expect(result.extractedText).toContain("**Button:** Sign In");
+  });
+
+  it("populates colors from palette field", () => {
+    const raw = `TYPE:
+photo
+
+CATEGORY:
+photography
+
+STYLE:
+minimalist, japanese
+
+MOOD:
+calm, refined
+
+MEDIUM:
+product-photography
+
+COMPOSITION:
+centered, negative-space
+
+PALETTE:
+kraft-brown, matte-black, off-white
+
+SUBJECT:
+Japanese tea packaging
+
+TAGS:
+tea, kraft-paper, wax-seal
+
+DESCRIPTION:
+- Centered kraft paper box on neutral background
+
+EXTRACTED_TEXT:
+None`;
+
+    const result = parseResponse(raw);
+    expect(result.palette).toBe("kraft-brown, matte-black, off-white");
+    // colors is populated from palette
+    expect(result.colors).toBe("kraft-brown, matte-black, off-white");
   });
 
   it("normalizes type to lowercase and validates against closed set", () => {
@@ -47,12 +104,6 @@ Screenshot
 
 SUBJECT:
 A test image
-
-COLORS:
-red, blue
-
-TAGS:
-test, image
 
 DESCRIPTION:
 Test description.
@@ -71,12 +122,6 @@ meme
 SUBJECT:
 A funny image
 
-COLORS:
-yellow, black
-
-TAGS:
-funny, meme
-
 DESCRIPTION:
 Something funny.
 
@@ -87,6 +132,13 @@ None`;
     expect(result.type).toBe("other");
   });
 
+  it("accepts new types: render-3d, collage, pattern, mockup", () => {
+    for (const t of ["render-3d", "collage", "pattern", "mockup"]) {
+      const raw = `TYPE:\n${t}\n\nSUBJECT:\nTest\n\nDESCRIPTION:\nDesc.\n\nEXTRACTED_TEXT:\nNone`;
+      expect(parseResponse(raw).type).toBe(t);
+    }
+  });
+
   it("truncates subject to 80 characters", () => {
     const longSubject = "A".repeat(100);
     const raw = `TYPE:
@@ -94,12 +146,6 @@ photo
 
 SUBJECT:
 ${longSubject}
-
-COLORS:
-red
-
-TAGS:
-test
 
 DESCRIPTION:
 A photo.
@@ -118,14 +164,8 @@ screenshot
 SUBJECT:
 Dashboard with navigation
 
-COLORS:
-dark blue, white, light gray
-
-TAGS:
-dashboard, navigation, stats, revenue, users
-
 DESCRIPTION:
-A dashboard view.
+- A dashboard view
 
 EXTRACTED_TEXT:
 **Navigation:** Home | Settings | Profile
@@ -147,14 +187,8 @@ photo
 SUBJECT:
 Sunset over the ocean
 
-COLORS:
-orange, purple, gold
-
-TAGS:
-sunset, ocean, horizon
-
 DESCRIPTION:
-A beautiful sunset with warm tones.
+- A beautiful sunset with warm tones
 
 EXTRACTED_TEXT:
 None`;
@@ -163,16 +197,48 @@ None`;
     expect(result.extractedText).toBe("");
   });
 
-  it("handles all valid types", () => {
+  it("handles all original valid types", () => {
     const types = [
       "screenshot", "photo", "diagram", "chart", "logo",
       "icon", "illustration", "document", "whiteboard", "other",
     ];
 
     for (const t of types) {
-      const raw = `TYPE:\n${t}\n\nSUBJECT:\nTest\n\nCOLORS:\nred\n\nTAGS:\ntag\n\nDESCRIPTION:\nDesc.\n\nEXTRACTED_TEXT:\nNone`;
+      const raw = `TYPE:\n${t}\n\nSUBJECT:\nTest\n\nDESCRIPTION:\nDesc.\n\nEXTRACTED_TEXT:\nNone`;
       expect(parseResponse(raw).type).toBe(t);
     }
+  });
+
+  it("returns empty new fields when not present (backward compat with old six-section)", () => {
+    const raw = `TYPE:
+photo
+
+SUBJECT:
+A test image
+
+COLORS:
+red, blue, green
+
+TAGS:
+test, image, colorful
+
+DESCRIPTION:
+Test description.
+
+EXTRACTED_TEXT:
+None`;
+
+    const result = parseResponse(raw);
+    expect(result.type).toBe("photo");
+    expect(result.category).toBe("");
+    expect(result.style).toBe("");
+    expect(result.mood).toBe("");
+    expect(result.medium).toBe("");
+    expect(result.composition).toBe("");
+    expect(result.palette).toBe("");
+    // colors falls back to COLORS when PALETTE is missing
+    expect(result.colors).toBe("red, blue, green");
+    expect(result.tags).toBe("test, image, colorful");
   });
 
   it("returns empty colors and tags when sections are missing (legacy four-section)", () => {
@@ -196,7 +262,7 @@ None`;
 });
 
 describe("parseResponse — legacy two-section format", () => {
-  it("parses legacy format with type=other, empty subject, empty colors/tags", () => {
+  it("parses legacy format with type=other, empty subject, empty new fields", () => {
     const raw = `DESCRIPTION:
 This is a screenshot of a login form with email and password fields.
 
@@ -209,6 +275,12 @@ Forgot password?`;
     const result = parseResponse(raw);
     expect(result.type).toBe("other");
     expect(result.subject).toBe("");
+    expect(result.category).toBe("");
+    expect(result.style).toBe("");
+    expect(result.mood).toBe("");
+    expect(result.medium).toBe("");
+    expect(result.composition).toBe("");
+    expect(result.palette).toBe("");
     expect(result.colors).toBe("");
     expect(result.tags).toBe("");
     expect(result.description).toBe(

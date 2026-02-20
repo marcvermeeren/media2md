@@ -14,10 +14,10 @@ import { buildSystemPrompt, buildUserPrompt } from "./prompts.js";
 import { renderTemplate } from "./templates/engine.js";
 import { DEFAULT_TEMPLATE } from "./templates/builtins.js";
 import { buildCacheKey, getCached, setCached } from "./cache/store.js";
+import { type Taxonomy, buildTaxonomy, validateParsed } from "./taxonomy.js";
 
 export interface ProcessOptions {
   model?: string;
-  persona?: string;
   prompt?: string;
   note?: string;
   template?: string;
@@ -25,10 +25,17 @@ export interface ProcessOptions {
   provider: Provider;
   providerName?: string;
   noCache?: boolean;
+  taxonomy?: Taxonomy;
 }
 
 export interface ProcessResult {
   type: string;
+  category: string;
+  style: string;
+  mood: string;
+  medium: string;
+  composition: string;
+  palette: string;
   subject: string;
   description: string;
   extractedText: string;
@@ -39,6 +46,7 @@ export interface ProcessResult {
   cached: boolean;
   usage?: { inputTokens: number; outputTokens: number };
   model?: string;
+  validationWarnings?: string[];
 }
 
 const FILE_SIZE_WARNING_BYTES = 15 * 1024 * 1024; // 15MB
@@ -100,7 +108,6 @@ async function _processCore(
   // Check cache
   const cacheKey = buildCacheKey(metadata.sha256, {
     model: options.model,
-    persona: options.persona,
     prompt: options.prompt,
     templateName: options.templateName,
     note: options.note,
@@ -112,6 +119,12 @@ async function _processCore(
     if (cached) {
       return {
         type: cached.type ?? "other",
+        category: cached.category ?? "",
+        style: cached.style ?? "",
+        mood: cached.mood ?? "",
+        medium: cached.medium ?? "",
+        composition: cached.composition ?? "",
+        palette: cached.palette ?? "",
         subject: cached.subject ?? "",
         description: cached.description,
         extractedText: cached.extractedText,
@@ -125,7 +138,7 @@ async function _processCore(
   }
 
   // Build prompts
-  const systemPrompt = buildSystemPrompt(options.persona, options.prompt, options.note);
+  const systemPrompt = buildSystemPrompt(options.prompt, options.note, options.taxonomy);
   const userPrompt = buildUserPrompt(metadata.filename, metadata.format);
 
   // Call provider
@@ -135,10 +148,24 @@ async function _processCore(
     { model: options.model, systemPrompt, userPrompt }
   );
 
+  // Detect model refusals (e.g. OpenAI content moderation)
+  if (isRefusal(response.rawText)) {
+    throw new Error(`Model refused to process ${metadata.filename} — content may have been flagged by the provider's safety filter`);
+  }
+
   // Parse response
-  const { type, subject, description, extractedText, colors, tags } = parseResponse(
-    response.rawText
-  );
+  const parsed = parseResponse(response.rawText);
+
+  // Validate against taxonomy (silently corrects strict fields)
+  const taxonomy = options.taxonomy ?? buildTaxonomy();
+  const { corrections, warnings } = validateParsed(parsed as unknown as Record<string, string>, taxonomy);
+
+  // Apply corrections over parsed values
+  const validated = { ...parsed, ...corrections };
+  const {
+    type, category, style, mood, medium, composition, palette,
+    subject, description, extractedText, colors, tags,
+  } = validated;
 
   // Build template variables
   const dimensions =
@@ -149,6 +176,12 @@ async function _processCore(
   const now = new Date();
   const vars: Record<string, string> = {
     type,
+    category,
+    style,
+    mood,
+    medium,
+    composition,
+    palette,
     subject,
     filename: metadata.filename,
     basename: metadata.basename,
@@ -162,7 +195,6 @@ async function _processCore(
     processedDate: now.toISOString().split("T")[0],
     datetime: now.toISOString(),
     model: options.model ?? "default",
-    persona: options.persona ?? "",
     note: options.note ?? "",
     sourcePath: `./${metadata.filename}`,
     description,
@@ -180,6 +212,12 @@ async function _processCore(
     await setCached(cacheKey, {
       hash: metadata.sha256,
       type,
+      category,
+      style,
+      mood,
+      medium,
+      composition,
+      palette,
       subject,
       markdown,
       description,
@@ -187,13 +225,18 @@ async function _processCore(
       colors,
       tags,
       model: options.model ?? "default",
-      persona: options.persona ?? "",
       cachedAt: now.toISOString(),
     });
   }
 
   return {
     type,
+    category,
+    style,
+    mood,
+    medium,
+    composition,
+    palette,
     subject,
     description,
     extractedText,
@@ -204,5 +247,23 @@ async function _processCore(
     cached: false,
     usage: response.usage,
     model: response.model,
+    validationWarnings: warnings.length ? warnings : undefined,
   };
+}
+
+const REFUSAL_PATTERNS = [
+  /^i'?m sorry,? i can'?t/i,
+  /^i cannot assist/i,
+  /^i'?m unable to/i,
+  /^i can'?t (help|provide|assist|describe|analyze)/i,
+  /^sorry,? but i (can'?t|cannot|am unable)/i,
+  /^i'?m not able to/i,
+  /^i apologize,? but/i,
+];
+
+function isRefusal(text: string): boolean {
+  const trimmed = text.trim();
+  // Refusals are short — a real description would be longer
+  if (trimmed.length > 300) return false;
+  return REFUSAL_PATTERNS.some((re) => re.test(trimmed));
 }

@@ -16,7 +16,6 @@ export interface WatchOptions {
   provider: Provider;
   providerName: string;
   model?: string;
-  persona?: string;
   prompt?: string;
   note?: string;
   template?: string;
@@ -161,7 +160,6 @@ export async function startWatch(
 
       const result = await processFile(filePath, {
         model: opts.model,
-        persona: opts.persona,
         prompt: opts.prompt,
         note: opts.note,
         template: tpl,

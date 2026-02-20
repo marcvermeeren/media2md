@@ -33,26 +33,46 @@ class MockProvider implements Provider {
   }
 }
 
-describe("processFile", () => {
-  it("processes a PNG file end-to-end with new format", async () => {
-    const provider = new MockProvider(`TYPE:
+const NEW_FORMAT_RESPONSE = `TYPE:
 photo
+
+CATEGORY:
+photography
+
+STYLE:
+minimalist, organic
+
+MOOD:
+calm, warm
+
+MEDIUM:
+product-photography
+
+COMPOSITION:
+centered, negative-space
+
+PALETTE:
+warm-red, soft-white
 
 SUBJECT:
 Small red test image for unit testing
 
-COLORS:
-red, white
-
 TAGS:
-test, square, solid color, unit test
+test-square, solid-color, unit-test
 
 DESCRIPTION:
-## Content
 - A small solid red square image used for unit testing
+- Minimal content with single flat color
 
 EXTRACTED_TEXT:
-None`, { usage: { inputTokens: 1000, outputTokens: 200 }, model: "claude-sonnet-4-5-20250929" });
+None`;
+
+describe("processFile", () => {
+  it("processes a PNG file end-to-end with new format", async () => {
+    const provider = new MockProvider(NEW_FORMAT_RESPONSE, {
+      usage: { inputTokens: 1000, outputTokens: 200 },
+      model: "claude-sonnet-4-5-20250929",
+    });
 
     const result = await processFile(join(FIXTURES, "test-image.png"), {
       provider,
@@ -60,21 +80,29 @@ None`, { usage: { inputTokens: 1000, outputTokens: 200 }, model: "claude-sonnet-
     });
 
     expect(result.type).toBe("photo");
+    expect(result.category).toBe("photography");
+    expect(result.style).toBe("minimalist, organic");
+    expect(result.mood).toBe("calm, warm");
+    expect(result.medium).toBe("product-photography");
+    expect(result.composition).toBe("centered, negative-space");
+    expect(result.palette).toBe("warm-red, soft-white");
     expect(result.subject).toBe("Small red test image for unit testing");
-    expect(result.colors).toBe("red, white");
-    expect(result.tags).toBe("test, square, solid color, unit test");
-    expect(result.description).toContain("## Content");
+    expect(result.tags).toBe("test-square, solid-color, unit-test");
     expect(result.description).toContain("solid red square");
     expect(result.extractedText).toBe("");
     expect(result.metadata.filename).toBe("test-image.png");
     expect(result.metadata.format).toBe("PNG");
+    // Frontmatter checks
     expect(result.markdown).toContain("source: test-image.png");
-    expect(result.markdown).toContain('type: photo');
-    expect(result.markdown).toContain("Small red test image for unit testing");
-    expect(result.markdown).toContain("colors: [red, white]");
-    expect(result.markdown).toContain("tags: [test, square, solid color, unit test]");
+    expect(result.markdown).toContain("type: photo");
+    expect(result.markdown).toContain("category: [photography]");
+    expect(result.markdown).toContain("style: [minimalist, organic]");
+    expect(result.markdown).toContain("mood: [calm, warm]");
+    expect(result.markdown).toContain("medium: product-photography");
+    expect(result.markdown).toContain("palette: [warm-red, soft-white]");
+    expect(result.markdown).toContain("tags: [test-square, solid-color, unit-test]");
     // No extracted text section since none was found
-    expect(result.markdown).not.toContain("## Extracted Text");
+    expect(result.markdown).not.toContain("## Text");
     // Usage and model are threaded through
     expect(result.usage).toEqual({ inputTokens: 1000, outputTokens: 200 });
     expect(result.model).toBe("claude-sonnet-4-5-20250929");
@@ -84,18 +112,32 @@ None`, { usage: { inputTokens: 1000, outputTokens: 200 }, model: "claude-sonnet-
     const provider = new MockProvider(`TYPE:
 screenshot
 
+CATEGORY:
+ui-design
+
+STYLE:
+minimalist, flat
+
+MOOD:
+calm, modern
+
+MEDIUM:
+screen-capture
+
+COMPOSITION:
+centered
+
+PALETTE:
+soft-white, primary-blue, light-gray
+
 SUBJECT:
 Login form with three fields
 
-COLORS:
-white, blue, gray
-
 TAGS:
-login, form, username, password, button
+login-form, username-input, password-field, submit-button
 
 DESCRIPTION:
-## Layout
-- A form with input fields
+- A form with input fields on white background
 
 EXTRACTED_TEXT:
 **Form Labels:** Username | Password
@@ -108,25 +150,40 @@ EXTRACTED_TEXT:
 
     expect(result.extractedText).toContain("**Form Labels:** Username | Password");
     expect(result.extractedText).toContain("**Button:** Submit");
-    expect(result.markdown).toContain("## Extracted Text");
+    expect(result.markdown).toContain("## Text");
     expect(result.markdown).toContain("**Form Labels:**");
   });
 
-  it("includes frontmatter with type and subject", async () => {
+  it("includes new fields in frontmatter", async () => {
     const provider = new MockProvider(`TYPE:
 diagram
+
+CATEGORY:
+data-visualization
+
+STYLE:
+minimalist, geometric
+
+MOOD:
+serious, modern
+
+MEDIUM:
+technical-drawing
+
+COMPOSITION:
+layered
+
+PALETTE:
+navy-blue, light-gray, clean-white
 
 SUBJECT:
 System architecture overview
 
-COLORS:
-blue, gray, white
-
 TAGS:
-architecture, system, diagram
+architecture-diagram, system-design, microservices
 
 DESCRIPTION:
-A diagram.
+- A system architecture diagram showing service connections
 
 EXTRACTED_TEXT:
 None`);
@@ -139,6 +196,9 @@ None`);
     expect(result.markdown).toMatch(/^---\n/);
     expect(result.markdown).toContain("type: diagram");
     expect(result.markdown).toContain('subject: "System architecture overview"');
+    expect(result.markdown).toContain("category: [data-visualization]");
+    expect(result.markdown).toContain("style: [minimalist, geometric]");
+    expect(result.markdown).toContain("medium: technical-drawing");
     expect(result.markdown).toContain("dimensions: 1x1");
     expect(result.markdown).toMatch(/processed: \d{4}-\d{2}-\d{2}/);
   });
@@ -187,14 +247,8 @@ photo
 SUBJECT:
 A JPEG test image
 
-COLORS:
-red
-
-TAGS:
-test, jpeg
-
 DESCRIPTION:
-A JPEG test image.
+- A JPEG test image
 
 EXTRACTED_TEXT:
 None`);
@@ -210,8 +264,6 @@ None`);
 
   it("does not include usage for cached results", async () => {
     const provider = new MockProvider("Test.", { usage: { inputTokens: 500, outputTokens: 100 }, model: "claude-sonnet-4-5-20250929" });
-    // Use noCache so it won't be cached — but the mock doesn't hit the cache path anyway
-    // We test that non-API results get no usage by using legacy format which still works
     const result = await processFile(join(FIXTURES, "test-image.png"), {
       provider,
       noCache: true,
@@ -219,6 +271,31 @@ None`);
     // Non-cached result should have usage
     expect(result.usage).toEqual({ inputTokens: 500, outputTokens: 100 });
     expect(result.cached).toBe(false);
+  });
+
+  it("throws on model refusal", async () => {
+    const provider = new MockProvider("I'm sorry, I can't help with that.");
+    await expect(
+      processFile(join(FIXTURES, "test-image.png"), { provider, noCache: true })
+    ).rejects.toThrow("Model refused to process");
+  });
+
+  it("throws on varied refusal phrasing", async () => {
+    const provider = new MockProvider("I cannot assist with this image.");
+    await expect(
+      processFile(join(FIXTURES, "test-image.png"), { provider, noCache: true })
+    ).rejects.toThrow("Model refused to process");
+  });
+
+  it("does not treat long responses as refusals", async () => {
+    const longResponse = "I'm sorry, I can't help with that. ".repeat(20);
+    const provider = new MockProvider(longResponse);
+    // Should NOT throw — long responses are real content, not refusals
+    const result = await processFile(join(FIXTURES, "test-image.png"), {
+      provider,
+      noCache: true,
+    });
+    expect(result.description).toContain("sorry");
   });
 
   it("handles legacy two-section format from provider", async () => {
@@ -235,6 +312,8 @@ Some text here`);
 
     expect(result.type).toBe("other");
     expect(result.subject).toBe("");
+    expect(result.category).toBe("");
+    expect(result.style).toBe("");
     expect(result.description).toBe("A legacy format response.");
     expect(result.extractedText).toBe("Some text here");
   });

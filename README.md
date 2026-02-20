@@ -35,8 +35,7 @@ Images are black boxes to AI tools, search, and text workflows. You can't grep a
 - Provider tiers — `--tier fast` for cheap/quick, `--tier quality` for best results
 - URL support — pass image URLs directly, or screenshot web pages via Playwright
 - Watch mode — auto-process new/changed images in a directory
-- 5 built-in personas (brand, design, developer, accessibility, marketing)
-- Focus directives (`--note`) that layer on top of any prompt mode
+- Custom instructions (`--prompt`) and focus directives (`--note`)
 - 4 built-in templates (default, minimal, alt-text, detailed) plus custom templates
 - Content-hash caching — skip unchanged files automatically
 - Cost estimation before processing (`--estimate`, `--dry-run`)
@@ -114,7 +113,7 @@ Auto-process new and changed images in a directory:
 m2md watch ./assets/                    # watch for new/changed images
 m2md watch ./assets/ --tier fast        # watch with fast tier
 m2md watch ./assets/ -o ./docs/         # custom output directory
-m2md watch ./assets/ --persona design   # watch with persona
+m2md watch ./assets/ -p "List all product names"  # watch with custom instructions
 ```
 
 On startup, existing images without a `.md` sidecar are processed. Then m2md watches for new/changed files and processes them automatically. Press `Ctrl+C` to stop.
@@ -132,42 +131,24 @@ m2md compare a.png b.png -o comparison.md         # write to file
 
 Outputs structured markdown with Summary, Similarities, Differences, and Verdict sections. Images are labeled A, B, C, etc.
 
-### Personas
+### Custom instructions (`--prompt`)
 
-Built-in personas shape how the AI describes images:
-
-```bash
-m2md screenshot.png --persona brand          # brand analyst lens
-m2md screenshot.png --persona design         # UI/UX designer lens
-m2md screenshot.png --persona developer      # software developer lens
-m2md screenshot.png --persona accessibility  # a11y expert lens
-m2md screenshot.png --persona marketing      # marketing analyst lens
-```
-
-| Persona | Focus |
-|---------|-------|
-| `brand` | Positioning, messaging, voice, competitive signals, visual identity |
-| `design` | Layout, grid, typography, color palette, spacing, hierarchy |
-| `developer` | UI components, architecture, data flows, API surfaces |
-| `accessibility` | Alt text, contrast ratios, keyboard navigation, ARIA concerns |
-| `marketing` | CTAs, conversion flow, social proof, audience targeting |
-
-### Custom prompt
-
-Override the persona entirely with a freeform prompt:
+Tell the model what to do differently. Instructions are appended to the built-in system prompt, so you get the structured output format plus your custom behavior:
 
 ```bash
-m2md screenshot.png --prompt "describe this from a security auditor's perspective"
+m2md screenshot.png -p "List all visible product names and prices"
+m2md ./assets/ -p "Identify every UI component and its state"
+m2md photo.jpg -p "Describe from a security auditor's perspective"
 ```
 
 ### Focus directives (`--note`)
 
-A freeform directive that's **additive** — it layers on top of whatever system prompt exists (base, persona, or custom `--prompt`). Unlike `--prompt`, it doesn't replace anything.
+A lightweight nudge that's **additive** — it tells the model to pay extra attention to something without changing the analysis instructions. Combine with `--prompt` or use on its own:
 
 ```bash
 m2md refs/*.png -n "watercolor technique, color palette, brushwork"
-m2md hero.png --persona design -n "dark mode, spacing tokens"
-m2md ./illos/ --prompt "art critique" -n "line weight and hatching"
+m2md hero.png -n "dark mode, spacing tokens"
+m2md ./illos/ -p "art critique" -n "line weight and hatching"
 ```
 
 ### Templates
@@ -200,7 +181,6 @@ Template variables available in custom templates:
 | `{{sha256}}` | Content hash |
 | `{{processedDate}}` / `{{datetime}}` | Processing timestamp |
 | `{{model}}` | AI model used |
-| `{{persona}}` | Persona used |
 | `{{note}}` | Focus directive |
 | `{{sourcePath}}` | Relative path to source file |
 
@@ -266,7 +246,7 @@ Create an `m2md.config.json` (or `.m2mdrc`, `.m2mdrc.json`, `.m2mdrc.yaml`) in y
 ```json
 {
   "tier": "fast",
-  "persona": "design",
+  "prompt": "Identify every UI component and its state",
   "note": "capture style, palette, spacing tokens",
   "output": "./docs",
   "recursive": true
@@ -280,9 +260,8 @@ All options are optional — only set what you want to override:
 | `provider` | AI provider (`anthropic`, `openai`) | `anthropic` |
 | `model` | AI model to use | provider default |
 | `tier` | Preset tier (`fast`, `quality`) | none |
-| `persona` | Built-in persona lens | none (base prompt) |
-| `prompt` | Custom prompt (overrides persona) | none |
-| `note` | Additive focus directive | none |
+| `prompt` | Custom instructions for the model | none |
+| `note` | Focus directive (additive nudge) | none |
 | `template` | Output template | `default` |
 | `output` | Output directory for `.md` files | next to image |
 | `name` | Output filename pattern (`{filename}`, `{date}`, `{type}`, `{subject}`) | none |
@@ -367,8 +346,7 @@ Add to your `.claude/settings.json`:
 | `filePath` | Yes | Absolute path to the image file |
 | `provider` | No | `anthropic` or `openai` |
 | `model` | No | AI model to use |
-| `persona` | No | brand, design, developer, accessibility, marketing |
-| `prompt` | No | Custom prompt (overrides persona) |
+| `prompt` | No | Custom instructions for the model |
 | `note` | No | Focus directive |
 | `template` | No | default, minimal, alt-text, detailed |
 
@@ -395,7 +373,7 @@ import { processFile, processBuffer, AnthropicProvider, OpenAIProvider } from "m
 // Process a local file
 const result = await processFile("screenshot.png", {
   provider: new AnthropicProvider(),   // or new OpenAIProvider()
-  persona: "design",
+  prompt: "Identify every UI component and its state",
   note: "spacing tokens",
 });
 

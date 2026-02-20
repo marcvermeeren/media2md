@@ -1,22 +1,24 @@
 export const DEFAULT_TEMPLATE = `---
 type: {{type}}
-subject: "{{subject}}"
-colors: [{{colors}}]
+{{#if category}}category: [{{category}}]
+{{/if}}{{#if style}}style: [{{style}}]
+{{/if}}{{#if mood}}mood: [{{mood}}]
+{{/if}}{{#if medium}}medium: {{medium}}
+{{/if}}{{#if composition}}composition: [{{composition}}]
+{{/if}}{{#if palette}}palette: [{{palette}}]
+{{/if}}subject: "{{subject}}"
 tags: [{{tags}}]
 source: {{filename}}
 dimensions: {{dimensions}}
 processed: {{processedDate}}
 model: {{model}}
-{{#if persona}}persona: {{persona}}
-{{/if}}{{#if note}}note: "{{note}}"
+{{#if note}}note: "{{note}}"
 {{/if}}---
-
-{{subject}}
 
 {{description}}
 
 {{#if extractedText}}
-## Extracted Text
+## Text
 
 {{extractedText}}
 {{/if}}
@@ -32,7 +34,13 @@ export const ALT_TEXT_TEMPLATE = `{{description}}
 
 export const DETAILED_TEMPLATE = `---
 type: {{type}}
-subject: "{{subject}}"
+{{#if category}}category: [{{category}}]
+{{/if}}{{#if style}}style: [{{style}}]
+{{/if}}{{#if mood}}mood: [{{mood}}]
+{{/if}}{{#if medium}}medium: {{medium}}
+{{/if}}{{#if composition}}composition: [{{composition}}]
+{{/if}}{{#if palette}}palette: [{{palette}}]
+{{/if}}subject: "{{subject}}"
 colors: [{{colors}}]
 tags: [{{tags}}]
 source: {{filename}}
@@ -45,8 +53,7 @@ sizeBytes: {{sizeBytes}}
 sha256: {{sha256}}
 processed: {{processedDate}}
 model: {{model}}
-{{#if persona}}persona: {{persona}}
-{{/if}}{{#if note}}note: "{{note}}"
+{{#if note}}note: "{{note}}"
 {{/if}}---
 
 # {{basename}}
@@ -56,7 +63,7 @@ model: {{model}}
 {{description}}
 
 {{#if extractedText}}
-## Extracted Text
+## Text
 
 {{extractedText}}
 {{/if}}

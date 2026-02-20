@@ -28,7 +28,6 @@ const sampleEntry: CacheEntry = {
   colors: "blue, white, gray",
   tags: "dashboard, chart, heading",
   model: "claude-sonnet-4-5-20250929",
-  persona: "",
   cachedAt: "2026-02-17T12:00:00.000Z",
 };
 
@@ -39,20 +38,14 @@ describe("buildCacheKey", () => {
   });
 
   it("same inputs produce same key", () => {
-    const a = buildCacheKey("abc", { model: "x", persona: "y" });
-    const b = buildCacheKey("abc", { model: "x", persona: "y" });
+    const a = buildCacheKey("abc", { model: "x", prompt: "y" });
+    const b = buildCacheKey("abc", { model: "x", prompt: "y" });
     expect(a).toBe(b);
   });
 
   it("different model produces different key", () => {
     const a = buildCacheKey("abc", { model: "model-a" });
     const b = buildCacheKey("abc", { model: "model-b" });
-    expect(a).not.toBe(b);
-  });
-
-  it("different persona produces different key", () => {
-    const a = buildCacheKey("abc", { persona: "brand" });
-    const b = buildCacheKey("abc", { persona: "design" });
     expect(a).not.toBe(b);
   });
 

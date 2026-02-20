@@ -1,58 +1,78 @@
-import { BUILTIN_PERSONAS } from "./personas/builtins.js";
+import { type Taxonomy, buildTaxonomy } from "./taxonomy.js";
 
-const BASE_SYSTEM_PROMPT = `You are an expert image analyst producing structured descriptions optimized for machine consumption by AI agents.
+function buildBaseSystemPrompt(taxonomy: Taxonomy): string {
+  return `You are an expert image analyst producing structured descriptions optimized for retrieval by AI agents.
 
-You MUST format your response with exactly these six sections:
+Your output will be stored as a searchable index. An LLM will later match user queries (e.g. "find me that minimalist Japanese packaging with the kraft paper texture") against your structured fields. Consistency and specificity are critical.
+
+You MUST format your response with exactly these sections:
 
 TYPE:
-[One of: screenshot, photo, diagram, chart, logo, icon, illustration, document, whiteboard, other]
+[Exactly one of: ${taxonomy.types.join(", ")}]
+
+CATEGORY:
+[1-2 from: ${taxonomy.categories.join(", ")}]
+Comma-separated if more than one.
+
+STYLE:
+[2-5 from: ${taxonomy.styles.join(", ")}]
+Pick from the list above. You may add one unlisted term if nothing fits. Comma-separated. Use hyphenated-compound-names.
+
+MOOD:
+[2-4 from: ${taxonomy.moods.join(", ")}]
+Pick from the list above. You may add one unlisted term if nothing fits. Comma-separated.
+
+MEDIUM:
+[Exactly one from: ${taxonomy.mediums.join(", ")}]
+
+COMPOSITION:
+[1-3 from: ${taxonomy.compositions.join(", ")}]
+Comma-separated if more than one.
+
+PALETTE:
+[3-6 descriptive hyphenated color names, comma-separated]
+Use specific compound names for consistency: kraft-brown, matte-black, warm-white, navy-blue, forest-green, coral-pink, soft-lavender, charcoal-gray.
+NOT generic names like "brown" or "blue". NOT hex values.
 
 SUBJECT:
 [One-line summary, max 80 characters — like an email subject line]
 
-COLORS:
-[3-6 dominant colors, comma-separated, common color names]
-
 TAGS:
-[5-15 key objects, concepts, and descriptors, comma-separated]
+[5-15 hyphenated keywords, comma-separated]
+Be specific: "japanese-typography" not "typography", "kraft-paper" not "paper".
+Do NOT duplicate values already in style, mood, category, or palette fields.
 
 DESCRIPTION:
-[Structured markdown description using subsections and bullet points. Organize by visual regions or logical groupings. Use ## subsection headings like ## Layout, ## Content, ## Visual Style as appropriate. Prefer bullet points over prose. Be specific and factual.]
+[Flat bullet points — NO subsection headings, NO prose paragraphs. Each bullet is one concrete visual observation. 5-12 bullets.]
 
 EXTRACTED_TEXT:
-[All visible text, grouped by context with bold labels. Preserve hierarchy and spatial relationships. Format example:
-**Navigation:** Home | About | Contact
-**Heading:** Welcome to Our Platform
-**Body:** First paragraph of content...
+[All visible text, minimally formatted. Use bold labels for grouping.
+**Brand:** Name Here
+**Heading:** Main text
+**Details:** Supporting text
 If no text is visible, write "None"]
 
-Guidelines:
-- TYPE must be exactly one value from the closed set above
-- SUBJECT should capture the essential "what" in a scannable line
-- COLORS: use common color names (e.g. red, dark gray, warm yellow), not hex values
-- TAGS: concrete nouns and descriptors (e.g. chair, dashboard, minimalist, dark mode)
-- DESCRIPTION: use ## subsections to organize content by region or theme; use bullet points, not paragraphs
-- EXTRACTED_TEXT: group related text under bold labels reflecting their UI context or spatial position
+Rules:
+- ALL array values must be hyphenated-lowercase: "packaging-design" not "packaging design"
+- TYPE must be exactly one value from the closed set
+- CATEGORY must be from the closed set
+- STYLE, MOOD, MEDIUM, COMPOSITION: prefer the suggested vocabulary, extend only when necessary
+- PALETTE: always descriptive compound names, 3-6 colors
+- TAGS: specific, no overlap with other structured fields
+- DESCRIPTION: flat bullet points only, no ## headings, no paragraphs
 - For screenshots: describe UI components, layout structure, interactive elements
 - For photos: describe subject, setting, composition, notable details
 - For diagrams: describe nodes, relationships, flow direction, hierarchy
 - For documents: describe structure, headings, content organization
 - If text is partially obscured or unclear, indicate with [unclear]`;
+}
 
-export function buildSystemPrompt(persona?: string, customPrompt?: string, note?: string): string {
-  let prompt: string;
+export function buildSystemPrompt(customPrompt?: string, note?: string, taxonomy?: Taxonomy): string {
+  const resolved = taxonomy ?? buildTaxonomy();
+  let prompt = buildBaseSystemPrompt(resolved);
 
-  // Custom --prompt overrides everything
   if (customPrompt) {
-    prompt = `${BASE_SYSTEM_PROMPT}\n\n${customPrompt}`;
-  } else if (persona && persona in BUILTIN_PERSONAS) {
-    // Named persona
-    prompt = `${BASE_SYSTEM_PROMPT}\n\n${BUILTIN_PERSONAS[persona].modifier}`;
-  } else if (persona) {
-    // Freeform persona string (backwards compat)
-    prompt = `${BASE_SYSTEM_PROMPT}\n\nAdditional context: ${persona}`;
-  } else {
-    prompt = BASE_SYSTEM_PROMPT;
+    prompt += `\n\n${customPrompt}`;
   }
 
   if (note) {
@@ -63,7 +83,7 @@ export function buildSystemPrompt(persona?: string, customPrompt?: string, note?
 }
 
 export function buildUserPrompt(filename: string, format: string): string {
-  return `Analyze this ${format} image (${filename}). Respond with TYPE:, SUBJECT:, COLORS:, TAGS:, DESCRIPTION:, and EXTRACTED_TEXT: sections as specified.`;
+  return `Analyze this ${format} image (${filename}). Respond with TYPE:, CATEGORY:, STYLE:, MOOD:, MEDIUM:, COMPOSITION:, PALETTE:, SUBJECT:, TAGS:, DESCRIPTION:, and EXTRACTED_TEXT: sections as specified.`;
 }
 
 const COMPARE_SYSTEM_PROMPT = `You are an expert image analyst comparing two images. Produce a structured comparison in markdown.

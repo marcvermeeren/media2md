@@ -71,14 +71,14 @@ describe("cache integration with processor", () => {
     expect(provider.callCount).toBe(2);
   });
 
-  it("different persona invalidates cache", async () => {
+  it("different prompt invalidates cache", async () => {
     const provider = new CountingProvider();
     const file = join(FIXTURES, "test-image.png");
 
-    await processFile(file, { provider, persona: "brand" });
+    await processFile(file, { provider, prompt: "List all products" });
     expect(provider.callCount).toBe(1);
 
-    await processFile(file, { provider, persona: "design" });
+    await processFile(file, { provider, prompt: "Describe the layout" });
     expect(provider.callCount).toBe(2);
   });
 

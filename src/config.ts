@@ -1,10 +1,10 @@
 import { cosmiconfig } from "cosmiconfig";
+import type { TaxonomyOverrides } from "./taxonomy.js";
 
 export interface M2mdConfig {
   provider?: string;
   model?: string;
   tier?: string;
-  persona?: string;
   prompt?: string;
   note?: string;
   template?: string;
@@ -14,6 +14,7 @@ export interface M2mdConfig {
   recursive?: boolean;
   cache?: boolean;
   concurrency?: number;
+  taxonomy?: TaxonomyOverrides;
 }
 
 export const TIER_MAP: Record<string, { provider: string; model: string }> = {

@@ -6,6 +6,12 @@ import { createHash } from "node:crypto";
 export interface CacheEntry {
   hash: string;
   type: string;
+  category?: string;
+  style?: string;
+  mood?: string;
+  medium?: string;
+  composition?: string;
+  palette?: string;
   subject: string;
   markdown: string;
   description: string;
@@ -13,7 +19,6 @@ export interface CacheEntry {
   colors?: string;
   tags?: string;
   model: string;
-  persona: string;
   cachedAt: string;
 }
 
@@ -36,16 +41,15 @@ function entryPath(key: string): string {
 
 /**
  * Build a cache key from the image content hash + options that affect output.
- * Changing model, persona, or template invalidates cache for the same image.
+ * Changing model, prompt, or template invalidates cache for the same image.
  */
 export function buildCacheKey(
   contentHash: string,
-  opts: { model?: string; persona?: string; prompt?: string; templateName?: string; note?: string; provider?: string }
+  opts: { model?: string; prompt?: string; templateName?: string; note?: string; provider?: string }
 ): string {
   const parts = [
     contentHash,
     opts.model ?? "",
-    opts.persona ?? "",
     opts.prompt ?? "",
     opts.templateName ?? "",
     opts.note ?? "",

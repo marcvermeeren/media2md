@@ -1,38 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { progressBar, table, stripAnsi } from "../src/utils/logger.js";
-
-describe("progressBar", () => {
-  it("returns empty bar at 0/N", () => {
-    const bar = stripAnsi(progressBar(0, 10, 10));
-    expect(bar).toBe("░░░░░░░░░░");
-  });
-
-  it("returns full bar at N/N", () => {
-    const bar = stripAnsi(progressBar(10, 10, 10));
-    expect(bar).toBe("██████████");
-  });
-
-  it("returns half-filled bar at N/2N", () => {
-    const bar = stripAnsi(progressBar(5, 10, 10));
-    expect(bar).toBe("█████░░░░░");
-  });
-
-  it("uses default width of 20", () => {
-    const bar = stripAnsi(progressBar(0, 1));
-    expect(bar).toHaveLength(20);
-  });
-
-  it("respects custom width", () => {
-    const bar = stripAnsi(progressBar(0, 1, 30));
-    expect(bar).toHaveLength(30);
-  });
-
-  it("returns string containing bar characters", () => {
-    const bar = progressBar(5, 10, 10);
-    expect(bar).toContain("█");
-    expect(bar).toContain("░");
-  });
-});
+import { table, stripAnsi } from "../src/utils/logger.js";
 
 describe("table", () => {
   let output: string;
