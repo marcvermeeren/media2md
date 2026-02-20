@@ -2,6 +2,12 @@
   "name": "m2md",
   "version": "0.1.0",
   "description": "Convert images to structured markdown with AI-generated descriptions and extracted text",
+  "author": "Marc Vermeeren",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcvermeeren/m2md.git"
+  },
+  "homepage": "https://github.com/marcvermeeren/m2md",
   "type": "module",
   "bin": {
     "m2md": "./dist/cli.js",
@@ -15,7 +21,8 @@
   },
   "files": [
     "dist",
-    "scripts"
+    "scripts/postinstall.js",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
@@ -45,6 +52,10 @@
     "image-size": "^2.0.1",
     "openai": "^6.22.0",
     "picocolors": "^1.1.1"
+  },
+  "optionalDependencies": {
+    "chokidar": "^4.0.0",
+    "playwright": "^1.50.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

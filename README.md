@@ -1,6 +1,10 @@
 # m2md
 
-Convert images to structured markdown with AI vision. Descriptions, extracted text, and metadata — ready for search, AI context windows, and documentation.
+Turn images into structured, searchable markdown with AI vision.
+
+I have 20 years of visual references — design inspiration, screenshots, diagrams, mood boards — scattered across folders. I use Obsidian for note-taking and wanted my vault to work for media too, not just text. The problem: images are invisible to search, to AI context windows, to `grep`. You can't find "that minimalist Japanese packaging with the kraft paper texture" in a folder of PNGs.
+
+m2md fixes that. One command turns any image into a structured `.md` sidecar with AI-generated descriptions, extracted text, typed metadata, and tags — ready for full-text search, vector search, and LLM retrieval.
 
 ```bash
 npm install -g m2md
@@ -21,10 +25,6 @@ m2md screenshot.png --stdout | pbcopy
 # Describe an image from a URL
 m2md https://example.com/photo.png
 ```
-
-## Why
-
-Images are black boxes to AI tools, search, and text workflows. You can't grep a screenshot. m2md fixes that — one command turns any image into structured, searchable markdown with AI-generated descriptions and extracted text.
 
 ## Features
 
@@ -167,6 +167,12 @@ Template variables available in custom templates:
 | Variable | Description |
 |----------|-------------|
 | `{{type}}` | Image type (screenshot, photo, diagram, chart, logo, etc.) |
+| `{{category}}` | Content category (ui-design, photography, data-visualization, etc.) |
+| `{{style}}` | Visual style (minimalist, flat, organic, etc.) |
+| `{{mood}}` | Mood/tone (calm, energetic, serious, etc.) |
+| `{{medium}}` | Medium (screen-capture, product-photography, technical-drawing, etc.) |
+| `{{composition}}` | Composition (centered, grid, layered, etc.) |
+| `{{palette}}` | Descriptive color names (kraft-brown, matte-black, etc.) |
 | `{{subject}}` | One-line summary |
 | `{{description}}` | AI-generated structured description |
 | `{{extractedText}}` | All visible text, grouped by context |
@@ -245,9 +251,8 @@ Create an `m2md.config.json` (or `.m2mdrc`, `.m2mdrc.json`, `.m2mdrc.yaml`) in y
 
 ```json
 {
-  "tier": "fast",
-  "prompt": "Identify every UI component and its state",
-  "note": "capture style, palette, spacing tokens",
+  "tier": "quality",
+  "note": "focus on typography, color palette, layout grid",
   "output": "./docs",
   "recursive": true
 }
@@ -294,46 +299,30 @@ m2md includes an MCP server (`m2md-mcp`) that exposes a `describe_image` tool ov
 
 The server **auto-detects API keys** from your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.zprofile`, `~/.bash_profile`, `~/.profile`), so you typically don't need to pass them explicitly. This is especially useful for GUI apps like Claude Desktop that don't inherit shell environment variables.
 
-### Claude Desktop
+### Claude Desktop / Claude Code
 
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "m2md": {
-      "command": "node",
-      "args": ["/path/to/m2md/dist/mcp.js"]
-    }
-  }
-}
-```
-
-If auto-detection doesn't find your key (e.g. it's set via a secrets manager), you can pass it explicitly:
-
-```json
-{
-  "mcpServers": {
-    "m2md": {
-      "command": "node",
-      "args": ["/path/to/m2md/dist/mcp.js"],
-      "env": {
-        "ANTHROPIC_API_KEY": "sk-ant-..."
-      }
-    }
-  }
-}
-```
-
-### Claude Code
-
-Add to your `.claude/settings.json`:
+Add to your MCP config (`claude_desktop_config.json` or `.claude/settings.json`):
 
 ```json
 {
   "mcpServers": {
     "m2md": {
       "command": "m2md-mcp"
+    }
+  }
+}
+```
+
+If API key auto-detection doesn't work (e.g. keys are in a secrets manager), pass them explicitly:
+
+```json
+{
+  "mcpServers": {
+    "m2md": {
+      "command": "m2md-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
     }
   }
 }
@@ -363,30 +352,23 @@ PNG, JPEG, WebP, GIF
 | Anthropic | 5 MB |
 | OpenAI | 20 MB |
 
-If an image exceeds the provider's limit, use `--provider openai` for larger files or resize the image first.
+If both API keys are set, m2md automatically routes oversized files to the other provider. Otherwise, use `--provider openai` for larger files or resize the image first.
 
 ## Programmatic API
 
 ```typescript
-import { processFile, processBuffer, AnthropicProvider, OpenAIProvider } from "m2md";
+import { processFile, AnthropicProvider } from "m2md";
 
-// Process a local file
 const result = await processFile("screenshot.png", {
-  provider: new AnthropicProvider(),   // or new OpenAIProvider()
-  prompt: "Identify every UI component and its state",
-  note: "spacing tokens",
+  provider: new AnthropicProvider(),
 });
 
+result.markdown;       // rendered markdown string
 result.description;    // AI-generated description
 result.extractedText;  // extracted text
+result.type;           // "screenshot", "photo", "diagram", etc.
+result.tags;           // comma-separated keywords
 result.metadata;       // { width, height, format, sizeHuman, sha256, ... }
-result.markdown;       // rendered markdown string
-
-// Process an in-memory buffer (e.g. from a URL fetch)
-const bufferResult = await processBuffer(
-  { buffer: imageBuffer, filename: "photo.png", mimeType: "image/png" },
-  { provider: new OpenAIProvider() }
-);
 ```
 
 ## License
