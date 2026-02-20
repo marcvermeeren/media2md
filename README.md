@@ -2,9 +2,9 @@
 
 Turn images into structured, searchable markdown with AI vision.
 
-I have 20 years of visual references — design inspiration, screenshots, diagrams, mood boards — scattered across folders. I use Obsidian for note-taking and wanted my vault to work for media too, not just text. The problem: images are invisible to search, to AI context windows, to `grep`. You can't find "that minimalist Japanese packaging with the kraft paper texture" in a folder of PNGs.
+I have 20 years of visual references (design inspiration, screenshots, diagrams, mood boards) scattered across folders. I use Obsidian for note-taking and wanted my vault to work for media too, not just text. The problem: images are invisible to search, to AI context windows, to `grep`. You can't find "that minimalist Japanese packaging with the kraft paper texture" in a folder of PNGs.
 
-m2md fixes that. One command turns any image into a structured `.md` sidecar with AI-generated descriptions, extracted text, typed metadata, and tags — ready for full-text search, vector search, and LLM retrieval.
+m2md fixes that. One command turns any image into a structured `.md` sidecar with AI-generated descriptions, extracted text, typed metadata, and tags. Ready for full-text search, vector search, and LLM retrieval.
 
 ```bash
 npm install -g m2md
