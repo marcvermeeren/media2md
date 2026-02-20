@@ -1,3 +1,14 @@
+// Suppress Node.js punycode deprecation warning from dependencies
+process.removeAllListeners("warning");
+const _origEmit = process.emit;
+// @ts-expect-error -- monkey-patch to filter a single noisy warning
+process.emit = function (event: string, ...args: unknown[]) {
+  if (event === "warning" && (args[0] as { name?: string })?.name === "DeprecationWarning") {
+    return false;
+  }
+  return _origEmit.apply(process, [event, ...args] as Parameters<typeof _origEmit>);
+};
+
 import { Command } from "commander";
 import { resolve } from "node:path";
 import { stat, writeFile, mkdir } from "node:fs/promises";
@@ -30,7 +41,7 @@ program
     writeErr: (str) => process.stderr.write(str),
     outputError: (str) => process.stderr.write(str),
   })
-  .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.1.0")}\n`)
+  .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.1.1")}\n`)
   .argument("[files...]", "Image file(s) or directory to process")
 .option("--provider <provider>", "AI provider: anthropic, openai")
   .option("-m, --model <model>", "AI model to use")

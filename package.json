@@ -1,6 +1,6 @@
 {
   "name": "media2md",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert images to structured markdown with AI-generated descriptions and extracted text",
   "author": "Marc Vermeeren",
   "repository": {
