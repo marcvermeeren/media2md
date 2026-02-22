@@ -9,7 +9,10 @@ export const CATEGORIES = [
   "web-design", "product-design", "interior-design", "architecture",
   "fashion", "illustration", "photography", "motion-design",
   "print-design", "signage", "data-visualization", "icon-design",
-  "editorial", "advertising", "art", "other",
+  "editorial", "advertising", "art",
+  "furniture-design", "textile-design", "ceramics", "jewelry-design",
+  "landscape-design", "film", "street-art", "calligraphy", "sculpture",
+  "other",
 ] as const;
 
 export const STYLES = [
@@ -51,6 +54,46 @@ export const COMPOSITIONS = [
   "rule-of-thirds", "symmetrical", "triptych", "diptych", "golden-ratio",
 ] as const;
 
+// ── Tag seed vocabulary ──────────────────────────────────────────
+// Canonical forms the LLM should prefer. Organized by domain so the
+// prompt can reference them. The model may still invent tags outside
+// this list as long as they follow the formation rules.
+
+export const TAG_VOCABULARY = {
+  materials: [
+    "kraft-paper", "newsprint", "cardstock", "vellum", "linen", "cotton",
+    "silk", "leather", "suede", "denim", "canvas", "plywood", "bamboo",
+    "marble", "terrazzo", "concrete", "brushed-metal", "brass", "copper",
+    "glass", "enamel", "resin", "cork",
+  ],
+  techniques: [
+    "letterpress", "screen-print", "risograph", "foil-stamp", "emboss",
+    "deboss", "die-cut", "laser-cut", "engraving", "etching", "linocut",
+    "woodblock", "cyanotype", "overprint", "duotone", "halftone", "stipple",
+    "crosshatch", "hand-drawn", "hand-painted", "blind-emboss", "spot-uv",
+  ],
+  finishes: [
+    "matte-finish", "glossy-finish", "satin-finish", "soft-touch",
+    "uncoated-stock", "spot-gloss", "textured-stock", "distressed",
+    "weathered", "patina",
+  ],
+  effects: [
+    "gradient", "drop-shadow", "noise-texture", "film-grain", "bokeh",
+    "lens-flare", "double-exposure", "long-exposure", "motion-blur", "glitch",
+  ],
+  photography: [
+    "natural-light", "studio-lighting", "golden-hour", "harsh-shadow",
+    "soft-shadow", "shallow-depth-of-field", "macro", "aerial-view",
+  ],
+  production: [
+    "saddle-stitch", "perfect-bind", "french-fold", "gatefold", "tip-in",
+    "belly-band", "deckle-edge", "dust-jacket",
+  ],
+} as const;
+
+/** Flat array of all canonical tag terms. */
+export const TAGS = Object.values(TAG_VOCABULARY).flat();
+
 export interface TaxonomyOverrides {
   types?: string[];
   categories?: string[];
@@ -58,6 +101,7 @@ export interface TaxonomyOverrides {
   moods?: string[];
   mediums?: string[];
   compositions?: string[];
+  tags?: string[];
 }
 
 export interface Taxonomy {
@@ -67,12 +111,13 @@ export interface Taxonomy {
   moods: readonly string[];
   mediums: readonly string[];
   compositions: readonly string[];
+  tags: readonly string[];
 }
 
 /** Merge default vocabularies with user overrides (extends, not replaces). */
 export function buildTaxonomy(overrides?: TaxonomyOverrides): Taxonomy {
   if (!overrides) {
-    return { types: TYPES, categories: CATEGORIES, styles: STYLES, moods: MOODS, mediums: MEDIUMS, compositions: COMPOSITIONS };
+    return { types: TYPES, categories: CATEGORIES, styles: STYLES, moods: MOODS, mediums: MEDIUMS, compositions: COMPOSITIONS, tags: TAGS };
   }
 
   return {
@@ -82,6 +127,7 @@ export function buildTaxonomy(overrides?: TaxonomyOverrides): Taxonomy {
     moods: dedupe([...MOODS, ...(overrides.moods ?? [])]),
     mediums: dedupe([...MEDIUMS, ...(overrides.mediums ?? [])]),
     compositions: dedupe([...COMPOSITIONS, ...(overrides.compositions ?? [])]),
+    tags: dedupe([...TAGS, ...(overrides.tags ?? [])]),
   };
 }
 

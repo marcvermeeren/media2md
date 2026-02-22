@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   TYPES, CATEGORIES, STYLES, MOODS, MEDIUMS, COMPOSITIONS,
+  TAGS, TAG_VOCABULARY,
   buildTaxonomy, validateParsed,
 } from "../src/taxonomy.js";
 
@@ -52,6 +53,49 @@ describe("taxonomy vocabulary", () => {
     const moodSet = new Set<string>(MOODS);
     const overlap = [...styleSet].filter((s) => moodSet.has(s));
     expect(overlap).toEqual([]);
+  });
+
+  it("CATEGORIES includes new creative disciplines", () => {
+    const cats = [...CATEGORIES];
+    for (const c of ["furniture-design", "textile-design", "ceramics", "jewelry-design",
+      "landscape-design", "film", "street-art", "calligraphy", "sculpture"]) {
+      expect(cats).toContain(c);
+    }
+  });
+
+  it("TAG_VOCABULARY has all 6 groups", () => {
+    expect(Object.keys(TAG_VOCABULARY).sort()).toEqual([
+      "effects", "finishes", "materials", "photography", "production", "techniques",
+    ]);
+  });
+
+  it("TAGS flat array contains terms from all groups", () => {
+    expect(TAGS).toContain("kraft-paper");
+    expect(TAGS).toContain("screen-print");
+    expect(TAGS).toContain("matte-finish");
+    expect(TAGS).toContain("gradient");
+    expect(TAGS).toContain("golden-hour");
+    expect(TAGS).toContain("saddle-stitch");
+  });
+
+  it("TAGS has no duplicates", () => {
+    expect(new Set(TAGS).size).toBe(TAGS.length);
+  });
+
+  it("all TAGS follow hyphenation convention", () => {
+    for (const tag of TAGS) {
+      expect(tag).not.toMatch(/\s/);
+      expect(tag).toBe(tag.toLowerCase());
+    }
+  });
+
+  it("buildTaxonomy includes tags and supports overrides", () => {
+    const t = buildTaxonomy();
+    expect(t.tags).toContain("kraft-paper");
+
+    const extended = buildTaxonomy({ tags: ["custom-tag"] });
+    expect(extended.tags).toContain("kraft-paper");
+    expect(extended.tags).toContain("custom-tag");
   });
 });
 

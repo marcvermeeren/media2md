@@ -74,10 +74,24 @@ describe("buildSystemPrompt field instructions", () => {
     expect(prompt).toContain("patina-green");
   });
 
-  it("TAGS instruction prioritizes materials and techniques", () => {
+  it("TAGS instruction includes seed vocabulary and formation rules", () => {
     const prompt = buildSystemPrompt();
-    expect(prompt).toContain("material names");
-    expect(prompt).toContain("technique names");
+    // Seed vocabulary groups
+    expect(prompt).toContain("Materials:");
+    expect(prompt).toContain("Techniques:");
+    expect(prompt).toContain("Finishes:");
+    expect(prompt).toContain("Effects:");
+    expect(prompt).toContain("Photography:");
+    expect(prompt).toContain("Production:");
+    // Canonical terms
+    expect(prompt).toContain("kraft-paper");
+    expect(prompt).toContain("screen-print");
+    expect(prompt).toContain("matte-finish");
+    expect(prompt).toContain("golden-hour");
+    // Formation rules
+    expect(prompt).toContain("Always singular");
+    expect(prompt).toContain("Specific over generic");
+    expect(prompt).toContain("Material-first in compounds");
   });
 
   it("TAGS instruction caps at 6-8", () => {

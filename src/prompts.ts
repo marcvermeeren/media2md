@@ -1,4 +1,4 @@
-import { type Taxonomy, buildTaxonomy } from "./taxonomy.js";
+import { type Taxonomy, buildTaxonomy, TAG_VOCABULARY } from "./taxonomy.js";
 
 function buildBaseSystemPrompt(taxonomy: Taxonomy): string {
   return `You are an expert image analyst producing structured descriptions optimized for retrieval by AI agents.
@@ -40,14 +40,25 @@ not "deep-black" (use ink-black, obsidian-black, soot-black). NOT hex values.
 SUBJECT:
 [One-line summary, max 80 characters — specific enough to distinguish from similar images]
 Use proper nouns and specific identification. "Aesop hand cream on travertine shelf" not "minimalist product photograph". Include brand names, place names, species names, technique names when identifiable.
-When mentioning colors, attribute them to the correct object — do not swap color-object pairings.
+COLOR-OBJECT ACCURACY: If you mention a color, it must describe the correct object. "cognac leather sofa, mustard side table" — never swap which color belongs to which object. When the 80-character limit forces you to drop a color, drop the color entirely rather than attach it to the wrong object.
 
 TAGS:
 [6-8 hyphenated keywords, comma-separated]
-Each tag must add a genuinely new searchable term not already covered by style, mood,
-category, palette, visual_elements, or references fields. Prioritize: material names
-(kraft-paper, brushed-aluminum), technique names (letterpress, risograph), proper nouns
-(helvetica, muji). Avoid generic adjectives.
+Prefer canonical forms from this seed vocabulary when applicable:
+Materials: ${TAG_VOCABULARY.materials.join(", ")}
+Techniques: ${TAG_VOCABULARY.techniques.join(", ")}
+Finishes: ${TAG_VOCABULARY.finishes.join(", ")}
+Effects: ${TAG_VOCABULARY.effects.join(", ")}
+Photography: ${TAG_VOCABULARY.photography.join(", ")}
+Production: ${TAG_VOCABULARY.production.join(", ")}
+You may add unlisted tags following these rules:
+- Always hyphenated compounds: "kraft-paper" not "kraftpaper"
+- Always singular: "gradient" not "gradients"
+- Specific over generic: "herringbone-parquet" not "wood-floor"
+- Material-first in compounds: "leather-texture" not "textured-leather"
+- Full form, no abbreviations: "screen-print" not "screenprint"
+- No adjective-only tags: "textured-stock" not just "textured"
+Each tag must not duplicate style, mood, category, palette, visual_elements, or references.
 
 VISUAL_ELEMENTS:
 [5-15 literal visible objects/elements, comma-separated on a single line]
@@ -127,7 +138,7 @@ Rules:
 - STYLE, MOOD, MEDIUM, COMPOSITION: prefer the suggested vocabulary, extend only when necessary
 - STYLE and MOOD must not share any terms — style is visual treatment, mood is emotional register
 - PALETTE: always material-driven compound names, 3-6 colors
-- TAGS: 6-8 genuinely distinct terms, no overlap with other structured fields; prioritize materials, techniques, proper nouns
+- TAGS: 6-8 terms, prefer seed vocabulary, follow formation rules (hyphenated, singular, specific, material-first)
 - VISUAL_ELEMENTS: only literal visible objects, 5-15 items
 - REFERENCES: 3-5 named movements/styles/designers, or "none" only for purely abstract content
 - USE_CASE: hyphenated designer use cases

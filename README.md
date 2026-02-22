@@ -63,25 +63,32 @@ Every image produces the same set of fields, making your entire collection query
 
 The prompt enforces specific rules so output stays useful at scale:
 
-- **Tags are capped at 6-8** and must not duplicate terms already in style, mood, palette, or references. They prioritize material names (kraft-paper, brushed-aluminum), technique names (letterpress, risograph), and proper nouns (helvetica, muji).
+- **Tags are capped at 6-8** and drawn from a seed vocabulary of 81 canonical terms across 6 groups (materials, techniques, finishes, effects, photography, production). Formation rules enforce consistency: always hyphenated, always singular, specific over generic, material-first compounds. The model can invent new tags following the same rules.
 - **Style and mood cannot share terms** — style is visual treatment, mood is emotional register. No "bold" in both.
 - **Palette uses evocative names only** — never generic "white" or "black." Always material-driven: bone-white, chalk-white, ink-black, obsidian-black.
 - **Search phrases are capped at 8-10** and must be meaningfully distinct (different angles: literal, conceptual, stylistic, use-case).
 - **References push for 3-5** specific entries — art-historical context, named designers, cultural movements. "none" only for purely abstract content.
 - **Dimensions must be non-overlapping** — each axis illuminates a genuinely distinct analytical lens.
-- **Subject lines attribute colors correctly** to objects (cognac sofa, mustard table — not the reverse).
+- **Subject lines attribute colors correctly** to objects — "cognac leather sofa, mustard side table" not the reverse. When the 80-character limit forces compression, the model drops the color rather than misattributing it.
 
 ### Controlled vocabulary
 
-Classification fields (`type`, `category`) use a closed vocabulary — unknown values are auto-corrected. Aesthetic fields (`style`, `mood`, `medium`, `composition`) use a suggested vocabulary of 100+ terms that the model can extend when needed. The vocabulary includes movements like bauhaus, de-stijl, wabi-sabi; mediums like letterpress, risograph, gouache; and compositions like rule-of-thirds, golden-ratio, triptych.
+The schema uses a three-tier vocabulary system:
 
-You can extend the vocabulary per-project via config:
+**Tier 1 — Strict enums** (`type`, `category`): closed vocabulary, auto-corrected in code. Unknown values are replaced with the nearest match or "other" with a warning. Categories cover 29 creative disciplines from branding and ui-design to ceramics, textile-design, and street-art.
+
+**Tier 2 — Normalized tags with seed vocabulary** (`tags`): 81 canonical terms the model prefers, plus formation rules that prevent fragmentation. The model can extend the vocabulary following the same rules (hyphenated, singular, material-first). Suggested fields (`style`, `mood`, `medium`, `composition`) work similarly — 100+ suggested terms, extensible when needed.
+
+**Tier 3 — Freeform** (`dimensions`, `search_phrases`, `description`): unconstrained fields that capture what controlled vocabularies can't.
+
+You can extend any vocabulary per-project via config:
 
 ```json
 {
   "taxonomy": {
     "styles": ["sneaker-culture", "streetwear"],
-    "categories": ["sneaker-design"]
+    "categories": ["sneaker-design"],
+    "tags": ["sneaker-silhouette", "midsole-tooling"]
   }
 }
 ```
