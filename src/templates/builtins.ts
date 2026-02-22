@@ -8,8 +8,21 @@ type: {{type}}
 {{/if}}{{#if palette}}palette: [{{palette}}]
 {{/if}}subject: "{{subject}}"
 tags: [{{tags}}]
-source: {{filename}}
-dimensions: {{dimensions}}
+{{#if visualElements}}visual_elements: [{{visualElements}}]
+{{/if}}{{#if references}}references: [{{references}}]
+{{/if}}{{#if useCase}}use_case: [{{useCase}}]
+{{/if}}{{#if colorHexYaml}}color_hex: [{{colorHexYaml}}]
+{{/if}}{{#if era}}era: [{{era}}]
+{{/if}}{{#if artifact}}artifact: [{{artifact}}]
+{{/if}}{{#if typography}}typography: [{{typography}}]
+{{/if}}{{#if script}}script: [{{script}}]
+{{/if}}{{#if culturalInfluence}}cultural_influence: [{{culturalInfluence}}]
+{{/if}}{{#if searchPhrasesYaml}}search_phrases:
+{{searchPhrasesYaml}}
+{{/if}}{{#if dimensionsYaml}}dimensions:
+{{dimensionsYaml}}
+{{/if}}source: {{filename}}
+dimensions_px: {{dimensionsPx}}
 processed: {{processedDate}}
 model: {{model}}
 {{#if note}}note: "{{note}}"
@@ -43,9 +56,22 @@ type: {{type}}
 {{/if}}subject: "{{subject}}"
 colors: [{{colors}}]
 tags: [{{tags}}]
-source: {{filename}}
+{{#if visualElements}}visual_elements: [{{visualElements}}]
+{{/if}}{{#if references}}references: [{{references}}]
+{{/if}}{{#if useCase}}use_case: [{{useCase}}]
+{{/if}}{{#if colorHexYaml}}color_hex: [{{colorHexYaml}}]
+{{/if}}{{#if era}}era: [{{era}}]
+{{/if}}{{#if artifact}}artifact: [{{artifact}}]
+{{/if}}{{#if typography}}typography: [{{typography}}]
+{{/if}}{{#if script}}script: [{{script}}]
+{{/if}}{{#if culturalInfluence}}cultural_influence: [{{culturalInfluence}}]
+{{/if}}{{#if searchPhrasesYaml}}search_phrases:
+{{searchPhrasesYaml}}
+{{/if}}{{#if dimensionsYaml}}dimensions:
+{{dimensionsYaml}}
+{{/if}}source: {{filename}}
 format: {{format}}
-dimensions: {{dimensions}}
+dimensions_px: {{dimensionsPx}}
 width: {{width}}
 height: {{height}}
 size: {{sizeHuman}}
@@ -74,7 +100,7 @@ model: {{model}}
 |----------|-------|
 | File | {{filename}} |
 | Format | {{format}} |
-| Dimensions | {{dimensions}} |
+| Dimensions | {{dimensionsPx}} |
 | Size | {{sizeHuman}} |
 | SHA-256 | {{sha256}} |
 | Processed | {{processedDate}} |

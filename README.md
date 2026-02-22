@@ -30,7 +30,7 @@ m2md https://example.com/photo.png
 
 - AI-powered image descriptions via Claude or OpenAI vision
 - Text extraction (OCR) from screenshots, documents, diagrams
-- YAML frontmatter with metadata (dimensions, format, hash)
+- YAML frontmatter with 25+ structured fields (type, style, mood, era, typography, palette, references, etc.)
 - Sidecar `.md` files next to images — makes directories greppable
 - Provider tiers — `--tier fast` for cheap/quick, `--tier quality` for best results
 - URL support — pass image URLs directly, or screenshot web pages via Playwright
@@ -166,22 +166,33 @@ Template variables available in custom templates:
 
 | Variable | Description |
 |----------|-------------|
-| `{{type}}` | Image type (screenshot, photo, diagram, chart, logo, etc.) |
-| `{{category}}` | Content category (ui-design, photography, data-visualization, etc.) |
-| `{{style}}` | Visual style (minimalist, flat, organic, etc.) |
-| `{{mood}}` | Mood/tone (calm, energetic, serious, etc.) |
-| `{{medium}}` | Medium (screen-capture, product-photography, technical-drawing, etc.) |
-| `{{composition}}` | Composition (centered, grid, layered, etc.) |
-| `{{palette}}` | Descriptive color names (kraft-brown, matte-black, etc.) |
-| `{{subject}}` | One-line summary |
-| `{{description}}` | AI-generated structured description |
+| `{{type}}` | Image type (screenshot, photo, diagram, chart, logo, icon, illustration, render-3d, etc.) |
+| `{{category}}` | Content category (ui-design, photography, packaging-design, etc.) |
+| `{{style}}` | Visual style (minimalist, brutalist, mid-century, bauhaus, wabi-sabi, etc.) |
+| `{{mood}}` | Mood/tone (calm, energetic, serene, dramatic, etc.) |
+| `{{medium}}` | Medium (screen-capture, product-photography, letterpress, risograph, etc.) |
+| `{{composition}}` | Composition (centered, grid, rule-of-thirds, golden-ratio, etc.) |
+| `{{palette}}` | Material-driven color names (kraft-brown, slate-blue, bone-white, etc.) |
+| `{{subject}}` | One-line summary (max 80 chars) |
+| `{{description}}` | 4-sentence structured description |
 | `{{extractedText}}` | All visible text, grouped by context |
-| `{{colors}}` | Dominant colors |
-| `{{tags}}` | Key objects, concepts, descriptors |
+| `{{colors}}` | Dominant colors (same as palette) |
+| `{{tags}}` | 6-8 searchable keywords (materials, techniques, proper nouns) |
+| `{{visualElements}}` | Literal visible objects (5-15 items) |
+| `{{references}}` | Design movements, named styles, artist/designer references |
+| `{{useCase}}` | Designer reference use cases |
+| `{{colorHex}}` / `{{colorHexYaml}}` | 3-5 hex color values sampled from the image |
+| `{{era}}` | Time period the design evokes (mid-century, 1970s, contemporary, etc.) |
+| `{{artifact}}` | Designed object type (poster, packaging-box, website, album-cover, etc.) |
+| `{{typography}}` | Typeface names, classifications, techniques |
+| `{{script}}` | Writing systems / languages visible (latin, kanji, hangul, etc.) |
+| `{{culturalInfluence}}` | Aesthetic lineages (japanese-wabi-sabi, scandinavian-functionalism, etc.) |
+| `{{searchPhrases}}` / `{{searchPhrasesYaml}}` | 8-10 natural language search phrases |
+| `{{dimensions}}` / `{{dimensionsYaml}}` | 2-5 reference-worthiness axes |
 | `{{filename}}` | Original filename |
 | `{{basename}}` | Filename without extension |
 | `{{format}}` | File format (PNG, JPEG, WebP, GIF) |
-| `{{dimensions}}` | Width x Height |
+| `{{dimensionsPx}}` | Width x Height |
 | `{{width}}` / `{{height}}` | Image dimensions |
 | `{{sizeHuman}}` / `{{sizeBytes}}` | File size |
 | `{{sha256}}` | Content hash |
@@ -363,12 +374,23 @@ const result = await processFile("screenshot.png", {
   provider: new AnthropicProvider(),
 });
 
-result.markdown;       // rendered markdown string
-result.description;    // AI-generated description
-result.extractedText;  // extracted text
-result.type;           // "screenshot", "photo", "diagram", etc.
-result.tags;           // comma-separated keywords
-result.metadata;       // { width, height, format, sizeHuman, sha256, ... }
+result.markdown;           // rendered markdown string
+result.description;        // 4-sentence structured description
+result.extractedText;      // extracted text
+result.type;               // "screenshot", "photo", "diagram", etc.
+result.category;           // "ui-design", "photography", etc.
+result.style;              // "minimalist, brutalist"
+result.mood;               // "calm, warm"
+result.tags;               // comma-separated keywords
+result.palette;            // material-driven color names
+result.era;                // "mid-century, contemporary"
+result.artifact;           // "poster", "website", etc.
+result.typography;         // "futura, sans-serif"
+result.script;             // "latin, english"
+result.culturalInfluence;  // "scandinavian-functionalism"
+result.references;         // "Bauhaus, Dieter Rams"
+result.searchPhrases;      // newline-separated search phrases
+result.metadata;           // { width, height, format, sizeHuman, sha256, ... }
 ```
 
 ## License

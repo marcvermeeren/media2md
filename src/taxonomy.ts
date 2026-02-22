@@ -16,17 +16,20 @@ export const STYLES = [
   "minimalist", "maximalist", "brutalist", "organic", "geometric",
   "retro", "futuristic", "vintage", "art-deco", "swiss",
   "japanese", "scandinavian", "industrial", "handmade", "editorial",
-  "playful", "corporate", "luxurious", "rustic", "experimental",
+  "corporate", "luxurious", "rustic", "experimental",
   "flat", "skeuomorphic", "glassmorphism", "neomorphism",
-  "abstract", "figurative", "monochrome", "colorful", "muted", "bold",
+  "abstract", "figurative", "monochrome", "colorful", "muted",
+  "mid-century", "art-nouveau", "gothic", "baroque", "psychedelic", "grunge",
+  "memphis", "constructivist", "de-stijl", "bauhaus", "pop-art", "surrealist",
+  "wabi-sabi", "tropical", "cottagecore", "cyberpunk",
 ] as const;
 
 export const MOODS = [
   "calm", "energetic", "playful", "serious", "elegant",
   "raw", "warm", "cool", "nostalgic", "modern",
-  "whimsical", "dramatic", "intimate", "grand", "minimal",
-  "dense", "light", "dark", "cheerful", "somber",
-  "confident", "delicate", "bold", "subtle",
+  "whimsical", "dramatic", "intimate", "grand",
+  "tense", "light", "dark", "cheerful", "somber",
+  "confident", "delicate", "bold", "subtle", "serene",
 ] as const;
 
 export const MEDIUMS = [
@@ -36,6 +39,8 @@ export const MEDIUMS = [
   "screen-capture", "technical-drawing", "infographic",
   "data-viz", "typographic-composition", "print-scan",
   "film-photography",
+  "linocut", "lithograph", "screen-print", "etching", "letterpress", "risograph",
+  "woodblock", "oil-painting", "gouache", "pastel", "charcoal", "acrylic",
 ] as const;
 
 export const COMPOSITIONS = [
@@ -43,6 +48,7 @@ export const COMPOSITIONS = [
   "radial", "full-bleed", "negative-space", "flat-lay",
   "isometric", "perspective", "split-screen", "modular",
   "stacked", "overlapping", "framed", "cropped", "panoramic",
+  "rule-of-thirds", "symmetrical", "triptych", "diptych", "golden-ratio",
 ] as const;
 
 export interface TaxonomyOverrides {

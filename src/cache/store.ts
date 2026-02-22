@@ -18,6 +18,17 @@ export interface CacheEntry {
   extractedText: string;
   colors?: string;
   tags?: string;
+  visualElements?: string;
+  references?: string;
+  useCase?: string;
+  colorHex?: string;
+  era?: string;
+  artifact?: string;
+  typography?: string;
+  script?: string;
+  culturalInfluence?: string;
+  searchPhrases?: string;
+  dimensions?: string;
   model: string;
   cachedAt: string;
 }

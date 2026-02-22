@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseResponse } from "../src/parser.js";
 
 describe("parseResponse — new retrieval-optimized format", () => {
-  it("parses well-formatted response with all new fields", () => {
+  it("parses well-formatted response with all fields", () => {
     const raw = `TYPE:
 screenshot
 
@@ -30,12 +30,46 @@ Login form with email and password fields
 TAGS:
 login-form, email-input, password-field, sign-in-button, authentication
 
+VISUAL_ELEMENTS:
+email input, password input, submit button, card container, shadow, placeholder text
+
+REFERENCES:
+Material Design, Google Sign-in
+
+USE_CASE:
+login-flow-reference, form-layout-inspiration
+
+COLOR_HEX:
+#1A237E, #FFFFFF, #E0E0E0
+
+ERA:
+contemporary
+
+ARTIFACT:
+website
+
+TYPOGRAPHY:
+sans-serif, roboto
+
+SCRIPT:
+latin, english
+
+CULTURAL_INFLUENCE:
+american-modernism
+
 DESCRIPTION:
-- Centered card with two input fields and a submit button
-- Email field with placeholder text
-- Password field with toggle visibility icon
-- "Sign In" primary button in blue
-- Light gray background with subtle shadow on card
+A centered login card presents email and password input fields on a light gray background. The design follows a flat, corporate aesthetic with a primary blue submit button. Input fields feature placeholder text and the password field includes a visibility toggle icon. The form serves as a standard authentication entry point for a web application.
+
+SEARCH_PHRASES:
+minimal login form with email and password
+corporate sign-in card on gray background
+flat design authentication form
+blue submit button login UI
+centered card login layout
+
+DIMENSIONS:
+layout-clarity: Clean single-column form with generous whitespace and clear visual hierarchy
+color-restraint: Limited palette of blue, white, and gray creates professional tone
 
 EXTRACTED_TEXT:
 **Form Labels:** Email | Password
@@ -52,8 +86,21 @@ EXTRACTED_TEXT:
     expect(result.palette).toBe("dark-blue, white, light-gray");
     expect(result.subject).toBe("Login form with email and password fields");
     expect(result.tags).toBe("login-form, email-input, password-field, sign-in-button, authentication");
-    expect(result.description).toContain("Centered card");
-    expect(result.description).toContain("primary button in blue");
+    expect(result.visualElements).toBe("email input, password input, submit button, card container, shadow, placeholder text");
+    expect(result.references).toBe("Material Design, Google Sign-in");
+    expect(result.useCase).toBe("login-flow-reference, form-layout-inspiration");
+    expect(result.colorHex).toBe("#1A237E, #FFFFFF, #E0E0E0");
+    expect(result.era).toBe("contemporary");
+    expect(result.artifact).toBe("website");
+    expect(result.typography).toBe("sans-serif, roboto");
+    expect(result.script).toBe("latin, english");
+    expect(result.culturalInfluence).toBe("american-modernism");
+    expect(result.description).toContain("centered login card");
+    expect(result.description).toContain("web application");
+    expect(result.searchPhrases).toContain("minimal login form with email and password");
+    expect(result.searchPhrases).toContain("blue submit button login UI");
+    expect(result.dimensions).toContain("layout-clarity:");
+    expect(result.dimensions).toContain("color-restraint:");
     expect(result.extractedText).toContain("**Form Labels:**");
     expect(result.extractedText).toContain("**Button:** Sign In");
   });
@@ -87,7 +134,7 @@ TAGS:
 tea, kraft-paper, wax-seal
 
 DESCRIPTION:
-- Centered kraft paper box on neutral background
+A kraft paper tea box sits centered on a neutral background.
 
 EXTRACTED_TEXT:
 None`;
@@ -165,7 +212,7 @@ SUBJECT:
 Dashboard with navigation
 
 DESCRIPTION:
-- A dashboard view
+A dashboard view with stats and navigation.
 
 EXTRACTED_TEXT:
 **Navigation:** Home | Settings | Profile
@@ -188,7 +235,7 @@ SUBJECT:
 Sunset over the ocean
 
 DESCRIPTION:
-- A beautiful sunset with warm tones
+A beautiful sunset with warm tones.
 
 EXTRACTED_TEXT:
 None`;
@@ -239,6 +286,18 @@ None`;
     // colors falls back to COLORS when PALETTE is missing
     expect(result.colors).toBe("red, blue, green");
     expect(result.tags).toBe("test, image, colorful");
+    // New fields should be empty
+    expect(result.visualElements).toBe("");
+    expect(result.references).toBe("");
+    expect(result.useCase).toBe("");
+    expect(result.colorHex).toBe("");
+    expect(result.era).toBe("");
+    expect(result.artifact).toBe("");
+    expect(result.typography).toBe("");
+    expect(result.script).toBe("");
+    expect(result.culturalInfluence).toBe("");
+    expect(result.searchPhrases).toBe("");
+    expect(result.dimensions).toBe("");
   });
 
   it("returns empty colors and tags when sections are missing (legacy four-section)", () => {
@@ -258,6 +317,113 @@ None`;
     expect(result.type).toBe("photo");
     expect(result.colors).toBe("");
     expect(result.tags).toBe("");
+  });
+
+  it("strips 'none' from references field", () => {
+    const raw = `TYPE:
+photo
+
+SUBJECT:
+A simple photo
+
+REFERENCES:
+none
+
+DESCRIPTION:
+A photo.
+
+EXTRACTED_TEXT:
+None`;
+
+    const result = parseResponse(raw);
+    expect(result.references).toBe("");
+  });
+
+  it("strips 'none' from artifact, typography, script, culturalInfluence", () => {
+    const raw = `TYPE:
+photo
+
+SUBJECT:
+A simple photo
+
+ARTIFACT:
+none
+
+TYPOGRAPHY:
+None
+
+SCRIPT:
+none
+
+CULTURAL_INFLUENCE:
+None
+
+DESCRIPTION:
+A photo.
+
+EXTRACTED_TEXT:
+None`;
+
+    const result = parseResponse(raw);
+    expect(result.artifact).toBe("");
+    expect(result.typography).toBe("");
+    expect(result.script).toBe("");
+    expect(result.culturalInfluence).toBe("");
+  });
+
+  it("strips 'None' (capitalized) from references field", () => {
+    const raw = `TYPE:
+photo
+
+SUBJECT:
+A simple photo
+
+REFERENCES:
+None
+
+DESCRIPTION:
+A photo.
+
+EXTRACTED_TEXT:
+None`;
+
+    const result = parseResponse(raw);
+    expect(result.references).toBe("");
+  });
+
+  it("parses multi-line boundary detection: DESCRIPTION → SEARCH_PHRASES → DIMENSIONS → EXTRACTED_TEXT", () => {
+    const raw = `TYPE:
+photo
+
+SUBJECT:
+Aesop hand cream on travertine shelf
+
+DESCRIPTION:
+An amber glass bottle sits on a travertine stone shelf. The label uses a clean serif typeface on cream stock. The warm lighting creates soft shadows against the neutral background. This is a product photography shot for a luxury skincare brand.
+
+SEARCH_PHRASES:
+amber bottle on stone shelf
+luxury skincare product photography
+Aesop-style packaging with serif typography
+warm neutral product photo
+
+DIMENSIONS:
+material-contrast: Amber glass against raw travertine creates warm tactile interplay
+typography-craft: Serif typeface on uncoated cream label signals artisanal positioning
+
+EXTRACTED_TEXT:
+**Brand:** Aesop
+**Product:** Resurrection Aromatique Hand Balm`;
+
+    const result = parseResponse(raw);
+    expect(result.description).toContain("amber glass bottle");
+    expect(result.description).not.toContain("amber bottle on stone shelf");
+    expect(result.searchPhrases).toContain("amber bottle on stone shelf");
+    expect(result.searchPhrases).not.toContain("material-contrast:");
+    expect(result.dimensions).toContain("material-contrast:");
+    expect(result.dimensions).toContain("typography-craft:");
+    expect(result.dimensions).not.toContain("**Brand:**");
+    expect(result.extractedText).toContain("**Brand:** Aesop");
   });
 });
 
@@ -283,6 +449,17 @@ Forgot password?`;
     expect(result.palette).toBe("");
     expect(result.colors).toBe("");
     expect(result.tags).toBe("");
+    expect(result.visualElements).toBe("");
+    expect(result.references).toBe("");
+    expect(result.useCase).toBe("");
+    expect(result.colorHex).toBe("");
+    expect(result.era).toBe("");
+    expect(result.artifact).toBe("");
+    expect(result.typography).toBe("");
+    expect(result.script).toBe("");
+    expect(result.culturalInfluence).toBe("");
+    expect(result.searchPhrases).toBe("");
+    expect(result.dimensions).toBe("");
     expect(result.description).toBe(
       "This is a screenshot of a login form with email and password fields."
     );

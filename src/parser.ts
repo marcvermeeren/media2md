@@ -9,7 +9,18 @@ export interface ParsedResponse {
   subject: string;
   colors: string;
   tags: string;
+  visualElements: string;
+  references: string;
+  useCase: string;
+  colorHex: string;
+  era: string;
+  artifact: string;
+  typography: string;
+  script: string;
+  culturalInfluence: string;
   description: string;
+  searchPhrases: string;
+  dimensions: string;
   extractedText: string;
 }
 
@@ -33,7 +44,10 @@ const VALID_TYPES = new Set([
 /** All section headers the new format can contain, used for boundary detection. */
 const ALL_SECTIONS = [
   "TYPE", "CATEGORY", "STYLE", "MOOD", "MEDIUM", "COMPOSITION",
-  "PALETTE", "SUBJECT", "COLORS", "TAGS", "DESCRIPTION", "EXTRACTED_TEXT",
+  "PALETTE", "SUBJECT", "COLORS", "TAGS",
+  "VISUAL_ELEMENTS", "REFERENCES", "USE_CASE", "COLOR_HEX",
+  "ERA", "ARTIFACT", "TYPOGRAPHY", "SCRIPT", "CULTURAL_INFLUENCE",
+  "DESCRIPTION", "SEARCH_PHRASES", "DIMENSIONS", "EXTRACTED_TEXT",
 ];
 
 const SECTION_BOUNDARY = ALL_SECTIONS.join("|");
@@ -53,6 +67,12 @@ export function parseResponse(rawText: string): ParsedResponse {
 
 function extractSingleLine(rawText: string, key: string): string {
   const re = new RegExp(`^${key}:\\s*(.+)`, "m");
+  const m = rawText.match(re);
+  return m ? m[1].trim() : "";
+}
+
+function extractMultiLine(rawText: string, key: string, boundary: string): string {
+  const re = new RegExp(`${key}:\\s*\\n([\\s\\S]*?)(?=\\n(?:${boundary}):|\\s*$)`);
   const m = rawText.match(re);
   return m ? m[1].trim() : "";
 }
@@ -78,13 +98,31 @@ function parseStructured(
 
   const tags = extractSingleLine(rawText, "TAGS");
 
-  const descBoundary = `\\n(?:${SECTION_BOUNDARY}):`;
-  const descMatch = rawText.match(
-    new RegExp(`DESCRIPTION:\\s*\\n([\\s\\S]*?)(?=${descBoundary}|\\s*$)`)
-  );
-  const textMatch = rawText.match(/EXTRACTED_TEXT:\s*\n([\s\S]*?)$/);
+  // New single-line fields
+  const visualElements = extractSingleLine(rawText, "VISUAL_ELEMENTS");
+  let references = extractSingleLine(rawText, "REFERENCES");
+  if (references.toLowerCase() === "none") references = "";
+  const useCase = extractSingleLine(rawText, "USE_CASE");
+  const colorHex = extractSingleLine(rawText, "COLOR_HEX");
 
-  const description = descMatch ? descMatch[1].trim() : "";
+  // New archival fields
+  const era = extractSingleLine(rawText, "ERA");
+  let artifact = extractSingleLine(rawText, "ARTIFACT");
+  if (artifact.toLowerCase() === "none") artifact = "";
+  let typography = extractSingleLine(rawText, "TYPOGRAPHY");
+  if (typography.toLowerCase() === "none") typography = "";
+  let script = extractSingleLine(rawText, "SCRIPT");
+  if (script.toLowerCase() === "none") script = "";
+  let culturalInfluence = extractSingleLine(rawText, "CULTURAL_INFLUENCE");
+  if (culturalInfluence.toLowerCase() === "none") culturalInfluence = "";
+
+  // Multi-line fields
+  const description = extractMultiLine(rawText, "DESCRIPTION", SECTION_BOUNDARY);
+  const searchPhrases = extractMultiLine(rawText, "SEARCH_PHRASES", SECTION_BOUNDARY);
+  const dimensions = extractMultiLine(rawText, "DIMENSIONS", SECTION_BOUNDARY);
+
+  // EXTRACTED_TEXT captures to EOF
+  const textMatch = rawText.match(/EXTRACTED_TEXT:\s*\n([\s\S]*?)$/);
   let extractedText = "";
 
   if (textMatch) {
@@ -94,7 +132,12 @@ function parseStructured(
     }
   }
 
-  return { type, category, style, mood, medium, composition, palette, subject, colors, tags, description, extractedText };
+  return {
+    type, category, style, mood, medium, composition, palette,
+    subject, colors, tags, visualElements, references, useCase, colorHex,
+    era, artifact, typography, script, culturalInfluence,
+    description, searchPhrases, dimensions, extractedText,
+  };
 }
 
 function parseLegacy(rawText: string): ParsedResponse {
@@ -114,7 +157,18 @@ function parseLegacy(rawText: string): ParsedResponse {
     subject: "",
     colors: "",
     tags: "",
+    visualElements: "",
+    references: "",
+    useCase: "",
+    colorHex: "",
+    era: "",
+    artifact: "",
+    typography: "",
+    script: "",
+    culturalInfluence: "",
     description: rawText.trim(),
+    searchPhrases: "",
+    dimensions: "",
     extractedText: "",
   };
 

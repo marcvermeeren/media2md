@@ -4,6 +4,57 @@ import {
   buildTaxonomy, validateParsed,
 } from "../src/taxonomy.js";
 
+describe("taxonomy vocabulary", () => {
+  it("STYLES includes new entries", () => {
+    const styles = [...STYLES];
+    for (const s of ["mid-century", "art-nouveau", "gothic", "baroque", "psychedelic", "grunge",
+      "memphis", "constructivist", "de-stijl", "bauhaus", "pop-art", "surrealist",
+      "wabi-sabi", "tropical", "cottagecore", "cyberpunk"]) {
+      expect(styles).toContain(s);
+    }
+  });
+
+  it("MEDIUMS includes new entries", () => {
+    const mediums = [...MEDIUMS];
+    for (const m of ["linocut", "lithograph", "screen-print", "etching", "letterpress", "risograph",
+      "woodblock", "oil-painting", "gouache", "pastel", "charcoal", "acrylic"]) {
+      expect(mediums).toContain(m);
+    }
+  });
+
+  it("COMPOSITIONS includes new entries", () => {
+    const compositions = [...COMPOSITIONS];
+    for (const c of ["rule-of-thirds", "symmetrical", "triptych", "diptych", "golden-ratio"]) {
+      expect(compositions).toContain(c);
+    }
+  });
+
+  it("STYLES does not contain mood-only terms (bold, playful)", () => {
+    const styles = [...STYLES];
+    expect(styles).not.toContain("playful");
+    expect(styles).not.toContain("bold");
+  });
+
+  it("MOODS does not contain style/density terms (minimal, dense)", () => {
+    const moods = [...MOODS];
+    expect(moods).not.toContain("minimal");
+    expect(moods).not.toContain("dense");
+  });
+
+  it("MOODS includes replacement terms (tense, serene)", () => {
+    const moods = [...MOODS];
+    expect(moods).toContain("tense");
+    expect(moods).toContain("serene");
+  });
+
+  it("no overlap between STYLES and MOODS", () => {
+    const styleSet = new Set<string>(STYLES);
+    const moodSet = new Set<string>(MOODS);
+    const overlap = [...styleSet].filter((s) => moodSet.has(s));
+    expect(overlap).toEqual([]);
+  });
+});
+
 describe("buildTaxonomy", () => {
   it("returns defaults when no overrides", () => {
     const t = buildTaxonomy();

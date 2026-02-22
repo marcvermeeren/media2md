@@ -90,6 +90,63 @@ describe("getCached / setCached", () => {
     const result = await getCached(key);
     expect(result!.description).toBe("Updated");
   });
+
+  it("round-trips new fields through cache", async () => {
+    const key = "new-fields-key";
+    const entry: CacheEntry = {
+      ...sampleEntry,
+      visualElements: "glass bottle, kraft label, wax seal",
+      references: "Swiss International Style, Dieter Rams",
+      useCase: "packaging-layout-inspiration, color-palette-reference",
+      colorHex: "#2C1810, #F5E6D3, #8B4513",
+      era: "mid-century",
+      artifact: "packaging-box",
+      typography: "futura, sans-serif",
+      script: "latin, english",
+      culturalInfluence: "japanese-wabi-sabi, scandinavian-functionalism",
+      searchPhrases: "minimalist Japanese tea packaging\nkraft paper box with wax seal",
+      dimensions: "craft-quality: Hand-applied gold foil\nmaterial-palette: Raw kraft and matte black",
+    };
+
+    await setCached(key, entry);
+    const result = await getCached(key);
+
+    expect(result).not.toBeNull();
+    expect(result!.visualElements).toBe("glass bottle, kraft label, wax seal");
+    expect(result!.references).toBe("Swiss International Style, Dieter Rams");
+    expect(result!.useCase).toBe("packaging-layout-inspiration, color-palette-reference");
+    expect(result!.colorHex).toBe("#2C1810, #F5E6D3, #8B4513");
+    expect(result!.era).toBe("mid-century");
+    expect(result!.artifact).toBe("packaging-box");
+    expect(result!.typography).toBe("futura, sans-serif");
+    expect(result!.script).toBe("latin, english");
+    expect(result!.culturalInfluence).toBe("japanese-wabi-sabi, scandinavian-functionalism");
+    expect(result!.searchPhrases).toContain("minimalist Japanese tea packaging");
+    expect(result!.dimensions).toContain("craft-quality:");
+  });
+
+  it("old cache entries without new fields still load (backward compat)", async () => {
+    const key = "old-entry-key";
+    // Simulate an old cache entry that lacks the new fields
+    await setCached(key, sampleEntry);
+
+    const result = await getCached(key);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe("screenshot");
+    expect(result!.subject).toBe("A test dashboard");
+    // New fields should be undefined (not present in old entries)
+    expect(result!.visualElements).toBeUndefined();
+    expect(result!.references).toBeUndefined();
+    expect(result!.useCase).toBeUndefined();
+    expect(result!.colorHex).toBeUndefined();
+    expect(result!.era).toBeUndefined();
+    expect(result!.artifact).toBeUndefined();
+    expect(result!.typography).toBeUndefined();
+    expect(result!.script).toBeUndefined();
+    expect(result!.culturalInfluence).toBeUndefined();
+    expect(result!.searchPhrases).toBeUndefined();
+    expect(result!.dimensions).toBeUndefined();
+  });
 });
 
 describe("clearCache", () => {

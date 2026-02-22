@@ -60,9 +60,45 @@ Small red test image for unit testing
 TAGS:
 test-square, solid-color, unit-test
 
+VISUAL_ELEMENTS:
+red square, solid fill, single pixel
+
+REFERENCES:
+none
+
+USE_CASE:
+color-swatch-reference, test-fixture-example
+
+COLOR_HEX:
+#FF0000, #FFFFFF
+
+ERA:
+contemporary
+
+ARTIFACT:
+none
+
+TYPOGRAPHY:
+none
+
+SCRIPT:
+none
+
+CULTURAL_INFLUENCE:
+none
+
 DESCRIPTION:
-- A small solid red square image used for unit testing
-- Minimal content with single flat color
+A small solid red square image used for unit testing with minimal content. The single flat color fills the entire frame without variation. No visible techniques or materials beyond digital color fill. This serves as a lightweight test fixture for image processing pipelines.
+
+SEARCH_PHRASES:
+solid red test image
+minimal single color square
+unit test fixture image
+red pixel test file
+
+DIMENSIONS:
+simplicity: Single solid color with no visual complexity serves as baseline test case
+color-purity: Pure red fill demonstrates unambiguous color sampling
 
 EXTRACTED_TEXT:
 None`;
@@ -88,6 +124,17 @@ describe("processFile", () => {
     expect(result.palette).toBe("warm-red, soft-white");
     expect(result.subject).toBe("Small red test image for unit testing");
     expect(result.tags).toBe("test-square, solid-color, unit-test");
+    expect(result.visualElements).toBe("red square, solid fill, single pixel");
+    expect(result.references).toBe("");
+    expect(result.useCase).toBe("color-swatch-reference, test-fixture-example");
+    expect(result.colorHex).toBe("#FF0000, #FFFFFF");
+    expect(result.era).toBe("contemporary");
+    expect(result.artifact).toBe("");
+    expect(result.typography).toBe("");
+    expect(result.script).toBe("");
+    expect(result.culturalInfluence).toBe("");
+    expect(result.searchPhrases).toContain("solid red test image");
+    expect(result.dimensions).toContain("simplicity:");
     expect(result.description).toContain("solid red square");
     expect(result.extractedText).toBe("");
     expect(result.metadata.filename).toBe("test-image.png");
@@ -101,6 +148,13 @@ describe("processFile", () => {
     expect(result.markdown).toContain("medium: product-photography");
     expect(result.markdown).toContain("palette: [warm-red, soft-white]");
     expect(result.markdown).toContain("tags: [test-square, solid-color, unit-test]");
+    expect(result.markdown).toContain("visual_elements: [red square, solid fill, single pixel]");
+    expect(result.markdown).toContain("use_case: [color-swatch-reference, test-fixture-example]");
+    expect(result.markdown).toContain("color_hex:");
+    expect(result.markdown).toContain("search_phrases:");
+    expect(result.markdown).toContain("dimensions_px:");
+    // references is "" so it should not appear
+    expect(result.markdown).not.toContain("references:");
     // No extracted text section since none was found
     expect(result.markdown).not.toContain("## Text");
     // Usage and model are threaded through
@@ -137,7 +191,7 @@ TAGS:
 login-form, username-input, password-field, submit-button
 
 DESCRIPTION:
-- A form with input fields on white background
+A form with input fields on a white background using a flat minimal style.
 
 EXTRACTED_TEXT:
 **Form Labels:** Username | Password
@@ -183,7 +237,7 @@ TAGS:
 architecture-diagram, system-design, microservices
 
 DESCRIPTION:
-- A system architecture diagram showing service connections
+A system architecture diagram showing service connections with labeled nodes.
 
 EXTRACTED_TEXT:
 None`);
@@ -199,7 +253,7 @@ None`);
     expect(result.markdown).toContain("category: [data-visualization]");
     expect(result.markdown).toContain("style: [minimalist, geometric]");
     expect(result.markdown).toContain("medium: technical-drawing");
-    expect(result.markdown).toContain("dimensions: 1x1");
+    expect(result.markdown).toContain("dimensions_px: 1x1");
     expect(result.markdown).toMatch(/processed: \d{4}-\d{2}-\d{2}/);
   });
 
@@ -248,7 +302,7 @@ SUBJECT:
 A JPEG test image
 
 DESCRIPTION:
-- A JPEG test image
+A JPEG test image for validation.
 
 EXTRACTED_TEXT:
 None`);
@@ -316,5 +370,29 @@ Some text here`);
     expect(result.style).toBe("");
     expect(result.description).toBe("A legacy format response.");
     expect(result.extractedText).toBe("Some text here");
+    expect(result.visualElements).toBe("");
+    expect(result.references).toBe("");
+    expect(result.useCase).toBe("");
+    expect(result.colorHex).toBe("");
+    expect(result.era).toBe("");
+    expect(result.artifact).toBe("");
+    expect(result.typography).toBe("");
+    expect(result.script).toBe("");
+    expect(result.culturalInfluence).toBe("");
+    expect(result.searchPhrases).toBe("");
+    expect(result.dimensions).toBe("");
+  });
+
+  it("new fields appear in rendered markdown frontmatter", async () => {
+    const provider = new MockProvider(NEW_FORMAT_RESPONSE);
+    const result = await processFile(join(FIXTURES, "test-image.png"), {
+      provider,
+      noCache: true,
+    });
+
+    expect(result.markdown).toContain("visual_elements: [red square, solid fill, single pixel]");
+    expect(result.markdown).toContain("use_case: [color-swatch-reference, test-fixture-example]");
+    expect(result.markdown).toContain("search_phrases:");
+    expect(result.markdown).toContain('"solid red test image"');
   });
 });

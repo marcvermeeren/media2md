@@ -22,10 +22,24 @@ const sampleVars: Record<string, string> = {
   subject: "Dashboard with analytics charts",
   colors: "dark-blue, white, light-gray",
   tags: "dashboard-chart, analytics-panel, navigation-sidebar",
+  visualElements: "line chart, bar chart, sidebar, navigation menu, header",
+  references: "Material Design, Google Analytics",
+  useCase: "dashboard-layout-reference, chart-styling-inspiration",
+  colorHex: '"#1A237E", "#FFFFFF", "#E0E0E0"',
+  colorHexYaml: '"#1A237E", "#FFFFFF", "#E0E0E0"',
+  era: "contemporary",
+  artifact: "website",
+  typography: "sans-serif, roboto",
+  script: "latin, english",
+  culturalInfluence: "american-modernism",
+  searchPhrases: '  - "analytics dashboard with charts"\n  - "corporate dashboard UI with sidebar"',
+  searchPhrasesYaml: '  - "analytics dashboard with charts"\n  - "corporate dashboard UI with sidebar"',
+  dimensions: "layout-system: Modular grid with sidebar and main content area",
+  dimensionsYaml: "  layout-system: Modular grid with sidebar and main content area",
   filename: "test.png",
   basename: "test",
   format: "PNG",
-  dimensions: "800x600",
+  dimensionsPx: "800x600",
   width: "800",
   height: "600",
   sizeHuman: "42.1 KB",
@@ -35,7 +49,7 @@ const sampleVars: Record<string, string> = {
   datetime: "2026-02-17T12:00:00.000Z",
   model: "claude-sonnet-4-5-20250929",
   sourcePath: "./test.png",
-  description: "- A dashboard with two chart panels\n- Line chart showing revenue\n- Bar chart showing users",
+  description: "A dashboard displays two chart panels showing revenue and user metrics. The design follows a clean corporate aesthetic with a sidebar navigation. Line and bar charts use the primary blue against white card backgrounds. This serves as an internal analytics tool for business monitoring.",
   extractedText: "**Navigation:** Dashboard | Settings | Logout\n**Chart Title:** Monthly Revenue",
 };
 
@@ -53,12 +67,29 @@ describe("built-in templates", () => {
     expect(result).toContain('subject: "Dashboard with analytics charts"');
     expect(result).toContain("tags: [dashboard-chart, analytics-panel, navigation-sidebar]");
     expect(result).toContain("source: test.png");
+    expect(result).toContain("dimensions_px: 800x600");
   });
 
-  it("default template renders flat bullet-point description", () => {
+  it("default template includes new search/reference fields", () => {
     const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
-    expect(result).toContain("- A dashboard with two chart panels");
-    expect(result).toContain("- Line chart showing revenue");
+    expect(result).toContain("visual_elements: [line chart, bar chart, sidebar, navigation menu, header]");
+    expect(result).toContain("references: [Material Design, Google Analytics]");
+    expect(result).toContain("use_case: [dashboard-layout-reference, chart-styling-inspiration]");
+    expect(result).toContain('color_hex: ["#1A237E", "#FFFFFF", "#E0E0E0"]');
+    expect(result).toContain("era: [contemporary]");
+    expect(result).toContain("artifact: [website]");
+    expect(result).toContain("typography: [sans-serif, roboto]");
+    expect(result).toContain("script: [latin, english]");
+    expect(result).toContain("cultural_influence: [american-modernism]");
+    expect(result).toContain("search_phrases:");
+    expect(result).toContain('analytics dashboard with charts');
+    expect(result).toContain("dimensions:");
+    expect(result).toContain("layout-system:");
+  });
+
+  it("default template renders description", () => {
+    const result = renderTemplate(DEFAULT_TEMPLATE, sampleVars);
+    expect(result).toContain("A dashboard displays two chart panels");
   });
 
   it("default template uses ## Text heading for extracted text", () => {
@@ -92,6 +123,17 @@ describe("built-in templates", () => {
       medium: "",
       composition: "",
       palette: "",
+      visualElements: "",
+      references: "",
+      useCase: "",
+      colorHexYaml: "",
+      era: "",
+      artifact: "",
+      typography: "",
+      script: "",
+      culturalInfluence: "",
+      searchPhrasesYaml: "",
+      dimensionsYaml: "",
     };
     const result = renderTemplate(DEFAULT_TEMPLATE, vars);
     expect(result).not.toContain("category:");
@@ -100,18 +142,30 @@ describe("built-in templates", () => {
     expect(result).not.toContain("medium:");
     expect(result).not.toContain("composition:");
     expect(result).not.toContain("palette:");
+    expect(result).not.toContain("visual_elements:");
+    expect(result).not.toContain("references:");
+    expect(result).not.toContain("use_case:");
+    expect(result).not.toContain("color_hex:");
+    expect(result).not.toContain("era:");
+    expect(result).not.toContain("artifact:");
+    expect(result).not.toContain("typography:");
+    expect(result).not.toContain("script:");
+    expect(result).not.toContain("cultural_influence:");
+    expect(result).not.toContain("search_phrases:");
+    // "dimensions:" still appears as dimensions_px
+    expect(result).toContain("dimensions_px:");
   });
 
   it("minimal template is just description + source link", () => {
     const result = renderTemplate(MINIMAL_TEMPLATE, sampleVars);
-    expect(result).toContain("- A dashboard with two chart panels");
+    expect(result).toContain("A dashboard displays two chart panels");
     expect(result).toContain("Source: [test.png](./test.png)");
     expect(result).not.toContain("---");
   });
 
   it("alt-text template is just description", () => {
     const result = renderTemplate(ALT_TEXT_TEMPLATE, sampleVars);
-    expect(result).toContain("- A dashboard with two chart panels");
+    expect(result).toContain("A dashboard displays two chart panels");
     expect(result).not.toContain("---");
     expect(result).not.toContain("Source:");
   });
@@ -129,8 +183,20 @@ describe("built-in templates", () => {
     expect(result).toContain('subject: "Dashboard with analytics charts"');
     expect(result).toContain("colors: [dark-blue, white, light-gray]");
     expect(result).toContain("tags: [dashboard-chart, analytics-panel, navigation-sidebar]");
+    expect(result).toContain("dimensions_px: 800x600");
     expect(result).toContain("# test");
     expect(result).toContain("![test](./test.png)");
+    // New fields in detailed template
+    expect(result).toContain("visual_elements:");
+    expect(result).toContain("references:");
+    expect(result).toContain("use_case:");
+    expect(result).toContain("color_hex:");
+    expect(result).toContain("era: [contemporary]");
+    expect(result).toContain("artifact: [website]");
+    expect(result).toContain("typography: [sans-serif, roboto]");
+    expect(result).toContain("script: [latin, english]");
+    expect(result).toContain("cultural_influence: [american-modernism]");
+    expect(result).toContain("search_phrases:");
   });
 
   it("BUILTIN_TEMPLATES map has all templates", () => {
@@ -174,7 +240,7 @@ describe("stripFrontmatter", () => {
     const stripped = stripFrontmatter(rendered);
     expect(stripped).not.toContain("type: screenshot");
     expect(stripped).not.toMatch(/^---/);
-    expect(stripped).toContain("- A dashboard with two chart panels");
+    expect(stripped).toContain("A dashboard displays two chart panels");
   });
 });
 

@@ -41,6 +41,17 @@ export interface ProcessResult {
   extractedText: string;
   colors: string;
   tags: string;
+  visualElements: string;
+  references: string;
+  useCase: string;
+  colorHex: string;
+  era: string;
+  artifact: string;
+  typography: string;
+  script: string;
+  culturalInfluence: string;
+  searchPhrases: string;
+  dimensions: string;
   metadata: ImageMetadata;
   markdown: string;
   cached: boolean;
@@ -130,6 +141,17 @@ async function _processCore(
         extractedText: cached.extractedText,
         colors: cached.colors ?? "",
         tags: cached.tags ?? "",
+        visualElements: cached.visualElements ?? "",
+        references: cached.references ?? "",
+        useCase: cached.useCase ?? "",
+        colorHex: cached.colorHex ?? "",
+        era: cached.era ?? "",
+        artifact: cached.artifact ?? "",
+        typography: cached.typography ?? "",
+        script: cached.script ?? "",
+        culturalInfluence: cached.culturalInfluence ?? "",
+        searchPhrases: cached.searchPhrases ?? "",
+        dimensions: cached.dimensions ?? "",
         metadata,
         markdown: cached.markdown,
         cached: true,
@@ -165,13 +187,27 @@ async function _processCore(
   const {
     type, category, style, mood, medium, composition, palette,
     subject, description, extractedText, colors, tags,
+    visualElements, references, useCase, colorHex,
+    era, artifact, typography, script, culturalInfluence,
+    searchPhrases, dimensions: rawDimensions,
   } = validated;
 
   // Build template variables
-  const dimensions =
+  const dimensionsPx =
     metadata.width && metadata.height
       ? `${metadata.width}x${metadata.height}`
       : "unknown";
+
+  // Pre-format YAML variants for new multi-line/list fields
+  const searchPhrasesYaml = searchPhrases
+    ? searchPhrases.split("\n").filter(l => l.trim()).map(l => `  - "${l.trim()}"`).join("\n")
+    : "";
+  const dimensionsYaml = rawDimensions
+    ? rawDimensions.split("\n").filter(l => l.trim()).map(l => `  ${l.trim()}`).join("\n")
+    : "";
+  const colorHexYaml = colorHex
+    ? colorHex.split(",").map(c => `"${c.trim()}"`).join(", ")
+    : "";
 
   const now = new Date();
   const vars: Record<string, string> = {
@@ -186,7 +222,7 @@ async function _processCore(
     filename: metadata.filename,
     basename: metadata.basename,
     format: metadata.format,
-    dimensions,
+    dimensionsPx,
     width: metadata.width?.toString() ?? "unknown",
     height: metadata.height?.toString() ?? "unknown",
     sizeHuman: metadata.sizeHuman,
@@ -201,6 +237,20 @@ async function _processCore(
     extractedText,
     colors,
     tags,
+    visualElements,
+    references,
+    useCase,
+    colorHex,
+    colorHexYaml,
+    era,
+    artifact,
+    typography,
+    script,
+    culturalInfluence,
+    searchPhrases,
+    searchPhrasesYaml,
+    dimensions: rawDimensions,
+    dimensionsYaml,
   };
 
   // Render template
@@ -224,6 +274,17 @@ async function _processCore(
       extractedText,
       colors,
       tags,
+      visualElements,
+      references,
+      useCase,
+      colorHex,
+      era,
+      artifact,
+      typography,
+      script,
+      culturalInfluence,
+      searchPhrases,
+      dimensions: rawDimensions,
       model: options.model ?? "default",
       cachedAt: now.toISOString(),
     });
@@ -242,6 +303,17 @@ async function _processCore(
     extractedText,
     colors,
     tags,
+    visualElements,
+    references,
+    useCase,
+    colorHex,
+    era,
+    artifact,
+    typography,
+    script,
+    culturalInfluence,
+    searchPhrases,
+    dimensions: rawDimensions,
     metadata,
     markdown,
     cached: false,
