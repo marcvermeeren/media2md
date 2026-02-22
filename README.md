@@ -43,6 +43,49 @@ m2md https://example.com/photo.png
 - MCP server for AI agent integration (Claude Desktop, etc.)
 - Programmatic API for use as a library
 
+## How the analysis works
+
+m2md doesn't just ask an AI to "describe this image." It sends a detailed structured prompt that produces consistent, searchable metadata across every image you process. Here's what that means in practice.
+
+### Structured schema (25+ fields)
+
+Every image produces the same set of fields, making your entire collection queryable:
+
+| Field group | Fields | What they capture |
+|-------------|--------|-------------------|
+| **Classification** | `type`, `category`, `medium` | What kind of image this is (photo, screenshot, diagram) and what discipline it belongs to (ui-design, packaging, photography) |
+| **Aesthetics** | `style`, `mood`, `palette`, `composition` | Visual treatment (minimalist, brutalist, mid-century), emotional register (calm, dramatic, serene), material-driven color names (kraft-brown, slate-blue, bone-white), and layout structure (rule-of-thirds, grid, layered) |
+| **Archival context** | `era`, `artifact`, `typography`, `script`, `cultural_influence` | Time period evoked (1970s, contemporary), designed object depicted (poster, packaging-box, website), typeface details (futura, sans-serif, letterpress), writing systems (latin, kanji, hangul), and aesthetic lineage (scandinavian-functionalism, japanese-wabi-sabi) |
+| **Discovery** | `tags`, `references`, `search_phrases`, `dimensions` | Searchable keywords, design movement references (Bauhaus, Dieter Rams), natural language search phrases, and analytical axes explaining why the image is reference-worthy |
+| **Content** | `subject`, `description`, `extracted_text`, `visual_elements`, `use_case`, `color_hex` | One-line summary, 4-sentence structured description, OCR text, literal visible objects, designer use cases, and sampled hex colors |
+
+### Quality constraints
+
+The prompt enforces specific rules so output stays useful at scale:
+
+- **Tags are capped at 6-8** and must not duplicate terms already in style, mood, palette, or references. They prioritize material names (kraft-paper, brushed-aluminum), technique names (letterpress, risograph), and proper nouns (helvetica, muji).
+- **Style and mood cannot share terms** — style is visual treatment, mood is emotional register. No "bold" in both.
+- **Palette uses evocative names only** — never generic "white" or "black." Always material-driven: bone-white, chalk-white, ink-black, obsidian-black.
+- **Search phrases are capped at 8-10** and must be meaningfully distinct (different angles: literal, conceptual, stylistic, use-case).
+- **References push for 3-5** specific entries — art-historical context, named designers, cultural movements. "none" only for purely abstract content.
+- **Dimensions must be non-overlapping** — each axis illuminates a genuinely distinct analytical lens.
+- **Subject lines attribute colors correctly** to objects (cognac sofa, mustard table — not the reverse).
+
+### Controlled vocabulary
+
+Classification fields (`type`, `category`) use a closed vocabulary — unknown values are auto-corrected. Aesthetic fields (`style`, `mood`, `medium`, `composition`) use a suggested vocabulary of 100+ terms that the model can extend when needed. The vocabulary includes movements like bauhaus, de-stijl, wabi-sabi; mediums like letterpress, risograph, gouache; and compositions like rule-of-thirds, golden-ratio, triptych.
+
+You can extend the vocabulary per-project via config:
+
+```json
+{
+  "taxonomy": {
+    "styles": ["sneaker-culture", "streetwear"],
+    "categories": ["sneaker-design"]
+  }
+}
+```
+
 ## Usage
 
 ### Single file
