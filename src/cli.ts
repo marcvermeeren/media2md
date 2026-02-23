@@ -41,7 +41,7 @@ program
     writeErr: (str) => process.stderr.write(str),
     outputError: (str) => process.stderr.write(str),
   })
-  .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.2.1")}\n`)
+  .version(`\n  ${pc.cyan(pc.bold("m2md"))} ${pc.dim("v0.2.2")}\n`)
   .argument("[files...]", "Image file(s) or directory to process")
 .option("--provider <provider>", "AI provider: anthropic, openai")
   .option("-m, --model <model>", "AI model to use")
