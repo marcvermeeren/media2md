@@ -1,7 +1,7 @@
 export const TYPES = [
-  "screenshot", "photo", "diagram", "chart", "logo", "icon",
-  "illustration", "document", "whiteboard", "render-3d",
-  "collage", "pattern", "mockup", "other",
+  "photo", "illustration", "painting", "sketch", "diagram", "chart",
+  "screenshot", "render-3d", "collage", "pattern", "document",
+  "whiteboard", "mockup", "other",
 ] as const;
 
 export const CATEGORIES = [

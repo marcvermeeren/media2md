@@ -246,8 +246,8 @@ None`;
 
   it("handles all original valid types", () => {
     const types = [
-      "screenshot", "photo", "diagram", "chart", "logo",
-      "icon", "illustration", "document", "whiteboard", "other",
+      "screenshot", "photo", "diagram", "chart", "painting",
+      "sketch", "illustration", "document", "whiteboard", "other",
     ];
 
     for (const t of types) {

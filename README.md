@@ -53,7 +53,7 @@ Every image produces the same set of fields, making your entire collection query
 
 | Field group | Fields | What they capture |
 |-------------|--------|-------------------|
-| **Classification** | `type`, `category`, `medium` | What kind of image this is (photo, screenshot, diagram) and what discipline it belongs to (ui-design, packaging, photography) |
+| **Classification** | `type`, `category`, `medium` | Visual form of the image (photo, illustration, painting, sketch, diagram, screenshot, render-3d, etc.) and what discipline it belongs to (ui-design, packaging, photography). Type describes how the image looks, not the subject — a photo of a logo is type "photo", not "logo". |
 | **Aesthetics** | `style`, `mood`, `palette`, `composition` | Visual treatment (minimalist, brutalist, mid-century), emotional register (calm, dramatic, serene), material-driven color names (kraft-brown, slate-blue, bone-white), and layout structure (rule-of-thirds, grid, layered) |
 | **Archival context** | `era`, `artifact`, `typography`, `script`, `cultural_influence` | Time period evoked (1970s, contemporary), designed object depicted (poster, packaging-box, website), typeface details (futura, sans-serif, letterpress), writing systems (latin, kanji, hangul), and aesthetic lineage (scandinavian-functionalism, japanese-wabi-sabi) |
 | **Discovery** | `tags`, `references`, `search_phrases`, `dimensions` | Searchable keywords, design movement references (Bauhaus, Dieter Rams), natural language search phrases, and analytical axes explaining why the image is reference-worthy |
@@ -216,7 +216,7 @@ Template variables available in custom templates:
 
 | Variable | Description |
 |----------|-------------|
-| `{{type}}` | Image type (screenshot, photo, diagram, chart, logo, icon, illustration, render-3d, etc.) |
+| `{{type}}` | Visual form (photo, illustration, painting, sketch, diagram, chart, screenshot, render-3d, etc.) |
 | `{{category}}` | Content category (ui-design, photography, packaging-design, etc.) |
 | `{{style}}` | Visual style (minimalist, brutalist, mid-century, bauhaus, wabi-sabi, etc.) |
 | `{{mood}}` | Mood/tone (calm, energetic, serene, dramatic, etc.) |

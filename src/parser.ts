@@ -25,18 +25,18 @@ export interface ParsedResponse {
 }
 
 const VALID_TYPES = new Set([
-  "screenshot",
   "photo",
+  "illustration",
+  "painting",
+  "sketch",
   "diagram",
   "chart",
-  "logo",
-  "icon",
-  "illustration",
-  "document",
-  "whiteboard",
+  "screenshot",
   "render-3d",
   "collage",
   "pattern",
+  "document",
+  "whiteboard",
   "mockup",
   "other",
 ]);

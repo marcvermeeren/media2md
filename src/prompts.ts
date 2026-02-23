@@ -9,6 +9,13 @@ You MUST format your response with exactly these sections:
 
 TYPE:
 [Exactly one of: ${taxonomy.types.join(", ")}]
+Type describes the visual form of the image, not the subject. Guidelines:
+photo — any photograph. illustration — digitally drawn artwork. painting — physical paint/canvas.
+sketch — rough, process-oriented drawing. diagram — nodes and relationships. chart — data visualization.
+screenshot — screen capture. render-3d — CGI/3D modeled. collage — composite of multiple images.
+pattern — repeating design. document — scanned/photographed document. mockup — product mockup.
+Do not use subject matter as type: a photo of a logo is type "photo", a vector logo is "illustration".
+Use the ARTIFACT field for what the designed object is (logo, icon-set, poster, etc.).
 
 CATEGORY:
 [1-2 from: ${taxonomy.categories.join(", ")}]
